@@ -20,6 +20,7 @@
 #include "stm32g4xx_ll_usart.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_adc.h"
+#include "trace.h"
 
 #ifndef GIT_TAG
 #define GIT_TAG "-.-.-"
@@ -37,6 +38,34 @@
 #ifndef MCU_TYPE
 #define MCU_TYPE "---------"
 #endif /* MCU_TYPE */
+
+#define ROW_SIZE                                16
+#define COLUMN_SIZE                             30
+
+#if COLUMN_SIZE == 30
+#define LINE_START_DELAY                        1047
+#define TIM1_AUTORELOAD                         24
+#elif COLUMN_SIZE == 32
+#define LINE_START_DELAY                        1146
+#define TIM1_AUTORELOAD                         21
+#elif COLUMN_SIZE == 36
+#define LINE_START_DELAY                        1075
+#define TIM1_AUTORELOAD                         19
+#elif COLUMN_SIZE == 40
+#define LINE_START_DELAY                        1077
+#define TIM1_AUTORELOAD                         17
+#elif COLUMN_SIZE == 42
+#define LINE_START_DELAY                        1088
+#define TIM1_AUTORELOAD                         16
+#else
+#undef COLUMN_SIZE
+#define COLUMN_SIZE                             30
+#define LINE_START_DELAY                        1046
+#define TIM1_AUTORELOAD                         24
+#endif
+
+#define PEXELS_PER_LINE                         (COLUMN_SIZE * 12)
+#define BLACK_LEVEL_ADC_DELAY_US                3300
 
 typedef enum {
   PX_BLACK = 0,
@@ -58,44 +87,44 @@ typedef enum {
   ADC_CH_COUNT
 } adc_ch_t;
 
-#define USER_KEY_Pin LL_GPIO_PIN_13
-#define USER_KEY_GPIO_Port GPIOC
-#define COMP3_INP_VIDEO_IN_Pin LL_GPIO_PIN_0
-#define COMP3_INP_VIDEO_IN_GPIO_Port GPIOA
-#define OPAMP1_VINPIO0_GRAY_COLOR_Pin LL_GPIO_PIN_1
-#define OPAMP1_VINPIO0_GRAY_COLOR_GPIO_Port GPIOA
-#define OPAMP1_VOUT_VIDEO_OUT_Pin LL_GPIO_PIN_2
-#define OPAMP1_VOUT_VIDEO_OUT_GPIO_Port GPIOA
-#define OPAMP1_VINPIO0_VIDEO_GEN_IN_Pin LL_GPIO_PIN_3
-#define OPAMP1_VINPIO0_VIDEO_GEN_IN_GPIO_Port GPIOA
-#define OPAMP1_VINPIO2_VIDEO_IN_Pin LL_GPIO_PIN_7
-#define OPAMP1_VINPIO2_VIDEO_IN_GPIO_Port GPIOA
-#define SPI2_CS_Pin LL_GPIO_PIN_14
-#define SPI2_CS_GPIO_Port GPIOB
-#define SPI2_SCK_Pin LL_GPIO_PIN_13
-#define SPI2_SCK_GPIO_Port GPIOB
-#define SPI2_MOSI_Pin LL_GPIO_PIN_15
-#define SPI2_MOSI_GPIO_Port GPIOB
-#define LED_STATE_Pin LL_GPIO_PIN_6
-#define LED_STATE_GPIO_Port GPIOC
-#define TIM17_CH1_VIDEO_GEN_OUT_Pin LL_GPIO_PIN_5
-#define TIM17_CH1_VIDEO_GEN_OUT_GPIO_Port GPIOB
-#define COMP3_OUT_SYNC_EXT_TRIGGER_Pin LL_GPIO_PIN_7
-#define COMP3_OUT_SYNC_EXT_TRIGGER_GPIO_Port GPIOB
-#define BOOT_KEY_Pin LL_GPIO_PIN_8
-#define BOOT_KEY_GPIO_Port GPIOB
 
-#define EXEC_RAM __attribute__((section (".ccmram.text"), optimize("Ofast"))) /* exec functions from CCMRAM */
-#define CCMRAM_DATA __attribute__((section (".ccmram.data"))) /* initialized var */
-#define CCMRAM_BSS __attribute__((section (".ccmram.bss"))) /* uninitialized var */
+#define OPAMP1_VOUT_VIDEO_OUT_Pin               LL_GPIO_PIN_2
+#define OPAMP1_VOUT_VIDEO_OUT_GPIO_Port         GPIOA
+#define OPAMP1_VINPIO0_VIDEO2_IN_Pin            LL_GPIO_PIN_1
+#define OPAMP1_VINPIO0_VIDEO2_IN_GPIO_Port      GPIOA
+#define OPAMP1_VINPIO2_VIDEO_IN_Pin             LL_GPIO_PIN_7
+#define OPAMP1_VINPIO2_VIDEO_IN_GPIO_Port       GPIOA
 
-#define DAC12BIT_TO_MV(value)      (((uint32_t)(value) * 3300) / 4095)
-#define DAC12BIT_FROM_MV(mV)       (((uint32_t)(mV) * 4095) / 3300)
+#define COMP_INP_VIDEO_SYNC_IN_Pin              LL_GPIO_PIN_0
+#define COMP_INP_VIDEO_SYNC_IN_GPIO_Port        GPIOA
 
-#define DAC8BIT_TO_MV(value)      (((uint32_t)(value) * 3300) / 255)
-#define DAC8BIT_FROM_MV(mV)       (((uint32_t)(mV) * 255) / 3300)
+#define SPI2_CS_Pin                             LL_GPIO_PIN_14
+#define SPI2_CS_GPIO_Port                       GPIOB
+#define SPI2_SCK_Pin                            LL_GPIO_PIN_13
+#define SPI2_SCK_GPIO_Port                      GPIOB
+#define SPI2_MOSI_Pin                           LL_GPIO_PIN_15
+#define SPI2_MOSI_GPIO_Port                     GPIOB
 
-#define VIDE_DETECTION_MV       (DAC12BIT_TO_MV(250)) // 250 mV for video detection
+#define USER_KEY_Pin                            LL_GPIO_PIN_13
+#define USER_KEY_GPIO_Port                      GPIOC
+#define LED_STATE_Pin                           LL_GPIO_PIN_6
+#define LED_STATE_GPIO_Port                     GPIOC
+#define BOOT_KEY_Pin                            LL_GPIO_PIN_8
+#define BOOT_KEY_GPIO_Port                      GPIOB
+
+#define EXEC_RAM      __attribute__((section (".ccmram.text"), optimize("Ofast"))) /* exec functions from CCMRAM */
+#define CCMRAM_DATA   __attribute__((section (".ccmram.data"))) /* initialized var */
+#define CCMRAM_BSS    __attribute__((section (".ccmram.bss"))) /* uninitialized var */
+
+#define DAC12BIT_TO_MV(value)                   (((uint32_t)(value) * 3300) / 4095)
+#define DAC12BIT_FROM_MV(mV)                    (((uint32_t)(mV) * 4095) / 3300)
+
+#define DAC8BIT_TO_MV(value)                    (((uint32_t)(value) * 3300) / 255)
+#define DAC8BIT_FROM_MV(mV)                     (((uint32_t)(mV) * 255) / 3300)
+
+#define VIDE_DETECTION_MV                       (DAC12BIT_FROM_MV(350)) // 250 mV for video detection
+
+#define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
 
 void gpio_init(void);
 void adc_init(void);
@@ -103,6 +132,7 @@ uint16_t adc_read_raw(adc_ch_t ch);
 uint16_t adc_read_mv(adc_ch_t ch);
 uint32_t adc_read_vdda_mv(void);
 float adc_read_mcu_temp_c(void);
+uint16_t adc_read_black_level(void);
 
 void DAC1_Init(void);
 void DAC3_Init(void);
@@ -116,9 +146,10 @@ void TIM2_Init(void);
 void TIM3_Init(void);
 void TIM4_Init(void);
 void TIM7_Init(void);
+void TIM15_Init(void);
 void TIM17_Init(void);
 
+void COMP2_Init(void);
 void COMP3_Init(void);
-void COMP4_Init(void);
 
 #endif /* __MAIN_H */

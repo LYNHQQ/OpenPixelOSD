@@ -1,3 +1,5 @@
+cmake_policy(SET CMP0091 OLD)
+
 cmake_minimum_required(VERSION 3.22)
 # ===== Build variant selection =====
 #   OpenPixelOSD      -> base OSD (no VTX drivers)

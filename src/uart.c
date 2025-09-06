@@ -52,21 +52,21 @@ void uart1_init(void)
     LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* USART1_RX DMA Init */
-    LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_1, LL_DMAMUX_REQ_USART1_RX);
+    LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_3, LL_DMAMUX_REQ_USART1_RX);
 
-    LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_CHANNEL_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+    LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_CHANNEL_3, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
 
-    LL_DMA_SetChannelPriorityLevel(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PRIORITY_LOW);
+    LL_DMA_SetChannelPriorityLevel(DMA2, LL_DMA_CHANNEL_3, LL_DMA_PRIORITY_LOW);
 
-    LL_DMA_SetMode(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MODE_CIRCULAR);
+    LL_DMA_SetMode(DMA2, LL_DMA_CHANNEL_3, LL_DMA_MODE_CIRCULAR);
 
-    LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PERIPH_NOINCREMENT);
+    LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_CHANNEL_3, LL_DMA_PERIPH_NOINCREMENT);
 
-    LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MEMORY_INCREMENT);
+    LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_CHANNEL_3, LL_DMA_MEMORY_INCREMENT);
 
-    LL_DMA_SetPeriphSize(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PDATAALIGN_BYTE);
+    LL_DMA_SetPeriphSize(DMA2, LL_DMA_CHANNEL_3, LL_DMA_PDATAALIGN_BYTE);
 
-    LL_DMA_SetMemorySize(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MDATAALIGN_BYTE);
+    LL_DMA_SetMemorySize(DMA2, LL_DMA_CHANNEL_3, LL_DMA_MDATAALIGN_BYTE);
 
     /* USART1_TX DMA  Init */
     LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_2, LL_DMAMUX_REQ_USART1_TX);
@@ -112,25 +112,25 @@ void uart1_init(void)
 
 void uart1_dma_rx_start(void)
 {
-    LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-    LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_1, LL_DMAMUX_REQ_USART1_RX);
-    LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_CHANNEL_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
-    LL_DMA_SetChannelPriorityLevel(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PRIORITY_HIGH);
-    LL_DMA_SetMode(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MODE_CIRCULAR);
-    LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PERIPH_NOINCREMENT);
-    LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MEMORY_INCREMENT);
-    LL_DMA_SetPeriphSize(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PDATAALIGN_BYTE);
-    LL_DMA_SetMemorySize(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MDATAALIGN_BYTE);
-    LL_DMA_ConfigAddresses(DMA2, LL_DMA_CHANNEL_1,
+    LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_3);
+    LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_3, LL_DMAMUX_REQ_USART1_RX);
+    LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_CHANNEL_3, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+    LL_DMA_SetChannelPriorityLevel(DMA2, LL_DMA_CHANNEL_3, LL_DMA_PRIORITY_HIGH);
+    LL_DMA_SetMode(DMA2, LL_DMA_CHANNEL_3, LL_DMA_MODE_CIRCULAR);
+    LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_CHANNEL_3, LL_DMA_PERIPH_NOINCREMENT);
+    LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_CHANNEL_3, LL_DMA_MEMORY_INCREMENT);
+    LL_DMA_SetPeriphSize(DMA2, LL_DMA_CHANNEL_3, LL_DMA_PDATAALIGN_BYTE);
+    LL_DMA_SetMemorySize(DMA2, LL_DMA_CHANNEL_3, LL_DMA_MDATAALIGN_BYTE);
+    LL_DMA_ConfigAddresses(DMA2, LL_DMA_CHANNEL_3,
                            (uint32_t)&USART1->RDR,
                            (uint32_t)uart_rx_buf,
                            LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
-    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, UART_RX_DMA_BUF_SIZE);
+    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_3, UART_RX_DMA_BUF_SIZE);
 
-    LL_DMA_EnableIT_HT(DMA2, LL_DMA_CHANNEL_1);
-    LL_DMA_EnableIT_TC(DMA2, LL_DMA_CHANNEL_1);
+    LL_DMA_EnableIT_HT(DMA2, LL_DMA_CHANNEL_3);
+    LL_DMA_EnableIT_TC(DMA2, LL_DMA_CHANNEL_3);
 
-    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_1);
+    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_3);
 
     LL_USART_EnableDMAReq_RX(USART1);
 
@@ -169,10 +169,10 @@ void uart1_tx_dma(uint8_t *data, uint32_t len)
     LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_2);
 }
 
-EXEC_RAM void DMA2_Channel1_IRQHandler(void)
+EXEC_RAM void DMA2_Channel3_IRQHandler(void)
 {
-    if (LL_DMA_IsActiveFlag_HT1(DMA2)) {
-        LL_DMA_ClearFlag_HT1(DMA2);
+    if (LL_DMA_IsActiveFlag_HT3(DMA2)) {
+        LL_DMA_ClearFlag_HT3(DMA2);
         // Processing the first half of the buffer (0 .. UART_RX_BUF_SIZE/2 - 1)
         for (uint32_t i = 0; i < UART_RX_DMA_BUF_SIZE / 2; i++) {
             uart_rx_ring_put(uart_rx_buf[i]);
@@ -180,8 +180,8 @@ EXEC_RAM void DMA2_Channel1_IRQHandler(void)
         dma_old_pos = UART_RX_DMA_BUF_SIZE / 2;
     }
 
-    if (LL_DMA_IsActiveFlag_TC1(DMA2)) {
-        LL_DMA_ClearFlag_TC1(DMA2);
+    if (LL_DMA_IsActiveFlag_TC3(DMA2)) {
+        LL_DMA_ClearFlag_TC3(DMA2);
         // Processing the second half of the buffer (UART_RX_BUF_SIZE/2 .. UART_RX_BUF_SIZE - 1)
         for (uint32_t i = UART_RX_DMA_BUF_SIZE / 2; i < UART_RX_DMA_BUF_SIZE; i++) {
             uart_rx_ring_put(uart_rx_buf[i]);

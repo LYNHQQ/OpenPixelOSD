@@ -13,6 +13,9 @@
 #include <rf_pa.h>
 #endif
 #include <stdio.h>
+#ifdef TRACE_LEVEL
+#include "dbgu.h"
+#endif
 
 #if defined(HIGH_RAM)
 #include "video_graphics.h"
@@ -39,6 +42,12 @@ int main (void)
 {
     HAL_Init();
     SystemClock_Config();
+    #ifdef USE_SWO
+    SWO_Init();
+    TRACE_INFO_WP("\n");
+    TRACE_INFO("Getting new Started Project --\r");
+    TRACE_INFO("Compiled: %s %s --\r", __DATE__, __TIME__);
+    #endif
     gpio_init();
     usb_init();
     dma_init();

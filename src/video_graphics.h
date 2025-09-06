@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include "main.h"
 
-#define VIDEO_WIDTH        (360U)
+#define VIDEO_WIDTH        (COLUMN_SIZE * 12U)
 #define VIDEO_HEIGHT       (288U)
 #define VIDEO_BPP          (2U)  // bits per pixel
 #define VIDEO_BYTES_PER_LINE ((VIDEO_WIDTH * VIDEO_BPP) / 8U)

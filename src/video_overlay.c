@@ -30,7 +30,7 @@
 #define OFFSET_SYNC         300
 #define OFFSET_TRANSPARENT  100
 #define OFFSET_WHITE        700
-#define OFFSET_GREY         350
+#define OFFSET_GREY         250
 
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
 #define DAC_WHITE           (DAC_BLACK + DAC12BIT_FROM_MV(OFFSET_WHITE))
@@ -42,8 +42,15 @@
 #define LOGO_OFFSET_X       (90)
 #define LOGO_OFFSET_Y       (25)
 
-static uint32_t opa_vals[4] = {OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC};
-uint16_t video_levels[5] = {DAC_SYNC, DAC_BLACK, DAC_BLACK, DAC_WHITE, DAC_GRAY};
+uint32_t opa_val[8] = { OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, 
+                        OPAMP_CONST_IO1, OPAMP_CONST_IO1, OPAMP_CONST_IO1, OPAMP_CONST_IO1  };
+
+uint16_t video_level[9] = { DAC_SYNC, DAC_BLACK, DAC_BLACK, DAC_WHITE, DAC_GRAY,
+                                      DAC_BLACK, DAC_GRAY, DAC_WHITE, DAC_GRAY};
+
+uint16_t* video_levels = &video_level[1];
+uint32_t* opa_vals = &opa_val[0];
+
 static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORLD/WORLD
 static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORLD/WORLD
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
@@ -63,13 +70,24 @@ extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 EXEC_RAM static void set_black_level(uint32_t new_level)
 {
   if (new_level > DAC12BIT_FROM_MV(OFFSET_SYNC))
-    video_levels[0] = new_level - DAC12BIT_FROM_MV(OFFSET_SYNC);
+    video_level[0] = new_level - DAC12BIT_FROM_MV(OFFSET_SYNC);
   else
-    video_levels[0] = 0;
-  video_levels[1] = new_level;
-  video_levels[2] = new_level + DAC12BIT_FROM_MV(OFFSET_TRANSPARENT);
-  video_levels[3] = new_level + DAC12BIT_FROM_MV(OFFSET_WHITE);
-  video_levels[4] = new_level + DAC12BIT_FROM_MV(OFFSET_GREY);
+    video_level[0] = 0;
+
+  video_level[1] = new_level;
+  video_level[2] = new_level + DAC12BIT_FROM_MV(OFFSET_TRANSPARENT);
+  video_level[3] = new_level + DAC12BIT_FROM_MV(OFFSET_WHITE);
+  video_level[4] = new_level + DAC12BIT_FROM_MV(OFFSET_GREY);
+
+#ifdef ALPHA_CHANNEL
+  video_level[5] = new_level;
+  video_level[6] = new_level + DAC12BIT_FROM_MV(OFFSET_TRANSPARENT);
+  video_level[7] = new_level + DAC12BIT_FROM_MV(OFFSET_WHITE);
+  video_level[8] = new_level + DAC12BIT_FROM_MV(OFFSET_GREY);
+
+  LL_DAC_ConvertData12RightAligned(DAC1, LL_DAC_CHANNEL_1, new_level + DAC12BIT_FROM_MV(300));
+  LL_DAC_TrigSWConversion(DAC1, LL_DAC_CHANNEL_1);
+#endif
 }
 
 EXEC_RAM static void init_buffers()
@@ -111,8 +129,16 @@ void video_overlay_init(void)
     TIM17_Init(); // TIM17 for video generator
     COMP2_Init(); // COMP2 for video sync detection
     //COMP3_Init(); // COMP3 for video sync detection
+    OPAMP3_Init();
+    
+#if defined(ALPHA_CHANNEL) && defined(STM32G474xx)
+    OPAMP6_Init();
+    LL_OPAMP_Enable(OPAMP6);
+#endif
 
     LL_OPAMP_Enable(OPAMP1);
+    LL_OPAMP_Enable(OPAMP3);
+    
 
     LL_COMP_Enable(COMP2);
     LL_COMP_Enable(COMP3);
@@ -124,13 +150,15 @@ void video_overlay_init(void)
     LL_DAC_Enable(DAC3, LL_DAC_CHANNEL_2);
     LL_DAC_Enable(DAC3, LL_DAC_CHANNEL_1);
 
+    LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_1);
+    LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_2);
+
     LL_TIM_EnableIT_UPDATE(TIM4);
     LL_TIM_EnableCounter(TIM4);
 
     LL_TIM_EnableIT_UPDATE(TIM17);
 
     LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, VIDE_DETECTION_MV);
-    LL_DAC_TrigSWConversion(DAC1, LL_DAC_CHANNEL_1);
 
     show_version();
     video_gen_enabled = true;
@@ -152,7 +180,7 @@ EXEC_RAM static void squash_canvas_raw_pixel_buff(char c, uint32_t glyph_row, ui
         uint8_t raw_byte = glyph[byte_index];
         uint8_t pixel = (raw_byte >> (6 - bit_offset)) & 0x03;
 
-        dac_buff[buf_idx][x_off + col] = video_levels[pixel + 1];
+        dac_buff[buf_idx][x_off + col] = video_levels[pixel];
         opamp_buff[buf_idx][x_off + col] = opa_vals[pixel];;
 
     }
@@ -180,22 +208,22 @@ void render_overlay_logo_line(uint16_t line)
     
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 6) & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 4) & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 2) & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = byte & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
     }
 }
@@ -285,22 +313,22 @@ EXEC_RAM void render_video_line(uint16_t line)
     
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 6) & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 4) & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 2) & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = byte & 0x3;
-        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel + 1];
+        dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
         opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
     }
     dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
@@ -381,7 +409,8 @@ EXEC_RAM void TIM2_IRQHandler(void)
     if (LL_TIM_IsActiveFlag_CC2(TIM2)) {
         TIM4->CNT = 0;
         video_source = OPAMP_CONST_IO2;
-        opa_vals[1] = video_source;
+        opa_val[1] = video_source;
+        opa_val[5] = OPAMP_CONST_IO1;
         OPAMP1->CSR = video_source;
         LL_TIM_DisableCounter(TIM8);
         if (video_gen_enabled == true) {
@@ -404,7 +433,8 @@ EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
       } else {
         TIM4->CNT = 0;
         video_source = OPAMP_CONST_DAC;
-        opa_vals[1] = video_source;
+        opa_val[1] = video_source;
+        opa_val[5] = OPAMP_CONST_DAC;
         OPAMP1->CSR = video_source;
         if (video_gen_enabled == false) {
             set_black_level(DAC_BLACK);

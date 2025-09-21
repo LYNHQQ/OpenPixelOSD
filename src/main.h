@@ -140,6 +140,8 @@ void DAC3_Init(void);
 void dma_init(void);
 
 void OPAMP1_Init(void);
+void OPAMP3_Init(void);
+void OPAMP6_Init(void);
 
 void TIM1_Init(void);
 void TIM2_Init(void);

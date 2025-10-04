@@ -20,6 +20,8 @@
 #define VTX_CH_LABEL_COUNT   8
 #define VTX_IS_FACTORY_BAND  1
 
+static void vtx_apply_hw(const vtx_config_t *cfg);
+
 typedef struct {
     char letter;                            /* 'A','B','E','F','R' */
     uint8_t band_name[VTX_CH_LABEL_COUNT];  /* shown in BF “Name”, exactly 8 bytes */
@@ -35,23 +37,23 @@ static const uint16_t g_power_mw[] = { 25, 100, 200, 800 };
  * You can add custom bands here if needed. */
 static const vtx_band_t g_bands[] = {
     /* Band A (Boscam A) */
-    { 'A', { 'B','O','S','C','A','M',' ',' ' },
+    { 'A', { 'B','O','S','C','A','M',' ','A' },
       { 5865,5845,5825,5805,5785,5765,5745,5725 } },
 
     /* Band B (Boscam B) */
-    { 'B', { 'B','O','S','C','A','M',' ',' ' },
+    { 'B', { 'B','O','S','C','A','M',' ','B' },
       { 5733,5752,5771,5790,5809,5828,5847,5866 } },
 
     /* Band E */
-    { 'E', { 'B','A','N','D',' ',' ',' ',' ' },
+    { 'E', { 'B','A','N','D',' ','E',' ',' ' },
       { 5705,5685,5665,5645,5885,5905,5925,5945 } },
 
     /* Band F (FatShark) */
-    { 'F', { 'F','a','t','S','h','a','r','k' },
+    { 'F', { 'F','A','T','S','H','A','R','K' },
       { 5740,5760,5780,5800,5820,5840,5860,5880 } },
 
     /* Band R (Raceband) */
-    { 'R', { 'R','a','c','e','b','a','n','d' },
+    { 'R', { 'R','A','C','E','B','A','N','D' },
       { 5658,5695,5732,5769,5806,5843,5880,5917 } },
 };
 #define NUM_BANDS (sizeof(g_bands)/sizeof(g_bands[0]))
@@ -62,6 +64,7 @@ static vtx_config_t g_cfg = {
     .frequency = 5658,
     .power = 1,
     .pitmode = 0,
+    .configSet =0,
 };
 
 /* ------------------------- MSP payload definitions -------------------------- */
@@ -94,6 +97,37 @@ const vtx_config_t* vtx_get_config(void)
     return &g_cfg;
 }
 
+const char* vtx_get_band_name(uint8_t band)
+{
+    return (char*)&g_bands[band].band_name;
+}
+
+uint8_t vtx_get_band_count(void)
+{
+    return NUM_BANDS;
+}
+
+uint8_t vtx_get_power_count(void)
+{
+    return NUM_PWR;
+}
+
+uint16_t vtx_get_power_mw(void)
+{
+    return g_power_mw[g_cfg.power];
+}
+
+uint16_t vtx_get_frequency(uint8_t band, uint8_t channel)
+{
+    return g_bands[band].freq[channel];
+}
+
+void vtx_set_pitmode(uint8_t pitmode)
+{
+    g_cfg.pitmode = pitmode;
+    vtx_apply_hw(&g_cfg);
+}
+
 static inline void msp_tx_send(uint8_t owner, const uint8_t *buf, uint16_t len)
 {
     if (owner == MSP_OWNER_USB) {
@@ -106,6 +140,23 @@ static inline void msp_tx_send(uint8_t owner, const uint8_t *buf, uint16_t len)
 static inline bool freq_is_in_58ghz(uint16_t mhz)
 {
     return (mhz >= 5600 && mhz <= 6000);
+}
+
+void vtx_set_band_channel(int8_t band, uint8_t channel)
+{
+    if(freq_is_in_58ghz(g_bands[band].freq[channel])) {
+        g_cfg.band = band;
+        g_cfg.channel = channel;
+        g_cfg.frequency = g_bands[band].freq[channel];
+        vtx_apply_hw(&g_cfg);
+    }
+    
+}
+
+void vtx_set_power(int8_t power)
+{
+    g_cfg.power = power;
+    vtx_apply_hw(&g_cfg);
 }
 
 /* -------------------- Hardware apply: RTC6705 + rf_pa ----------------------- */
@@ -218,7 +269,8 @@ static void handle_msp_set_vtx_config(uint8_t owner, const uint8_t *payload, uin
     g_cfg.channel = ch_raw;
     g_cfg.band = band_raw;
     g_cfg.vtx_table_available = vtx_table_available;
-
+    g_cfg.configSet = 1;
+    
     /* Apply to hardware */
     static uint16_t last_freq;
     static uint8_t last_power;
@@ -374,6 +426,13 @@ void vtx_msp_request_config(uint8_t owner)
 {
     uint8_t tx_buff[64];
     const uint16_t len = construct_msp_command_v1(tx_buff, MSP_VTX_CONFIG, NULL, 0, MSP_OUTBOUND);
+    msp_tx_send_owner(owner, tx_buff, len);
+}
+
+void vtx_msp_send_command(uint8_t owner, uint8_t command)
+{
+    uint8_t tx_buff[64];
+    const uint16_t len = construct_msp_command_v1(tx_buff, command, NULL, 0, MSP_OUTBOUND);
     msp_tx_send_owner(owner, tx_buff, len);
 }
 

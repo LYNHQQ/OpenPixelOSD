@@ -22,16 +22,20 @@
 
 #define N_SYNC                (PAL_HSYNC_TIME*GEN_TIMER_CLOCK_FREQ)
 #define P_SYNC                (PAL_LINE - N_SYNC)
+#define P_SSYNC               ((PAL_LINE / 2) - N_SYNC)
 
 #define N_LSYNC               (PAL_LSYNC_TIME*GEN_TIMER_CLOCK_FREQ)
 #define P_LSYNC               ((PAL_LINE / 2) - N_LSYNC)
 
 #define N_HSYNC               ((N_SYNC / 2))
 #define P_HSYNC               ((PAL_LINE / 2) - N_HSYNC)
+#define P_HLSYNC              ((PAL_LINE) - N_HSYNC)
 
 #define SYNC                  N_SYNC, P_SYNC
+#define SSYNC                 N_SYNC, P_SSYNC
 #define LSYNC                 N_LSYNC, P_LSYNC
 #define HSYNC                 N_HSYNC, P_HSYNC
+#define HLSYNC                N_HSYNC, P_HLSYNC
 
 extern uint16_t video_level[];
 
@@ -88,7 +92,7 @@ const uint16_t blank_pal_signal[GEN_BLANK_PAL_LINES] =
     HSYNC,HSYNC, // line 316
     HSYNC,HSYNC, // line 317
     //  Field 2
-    HSYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, // line 318-327
+    HLSYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, // line 318-327
     SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, // line 328-337
     SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, // line 338-347
     SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, // line 348-357
@@ -120,7 +124,7 @@ const uint16_t blank_pal_signal[GEN_BLANK_PAL_LINES] =
     SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, SYNC,SYNC, // line 418-617
     SYNC,SYNC, SYNC,SYNC, SYNC, // line 618-622
 
-    SYNC,HSYNC, // line 623
+    SSYNC,HSYNC, // line 623
     HSYNC,HSYNC, // line 624
     HSYNC,HSYNC  // line 625
 };

@@ -38,9 +38,18 @@ EXEC_RAM void canvas_char_write(uint8_t x, uint8_t y, const char *data, const ui
 
 EXEC_RAM void canvas_char_draw_complete(void)
 {
-
+    active_buffer = paint_buffer; // Switch active buffer
 #if defined(HIGH_RAM)
     video_render_canvas_from_map(); // Render canvas map to video frame buffer
 #endif
-    active_buffer = paint_buffer; // Switch active buffer
+    
+}
+
+EXEC_RAM void canvas_print(uint8_t x, uint8_t y, const char *str) {
+  if (x >= COLUMN_SIZE) return;
+  if (y >= ROW_SIZE) return;
+
+  while (*str && x < COLUMN_SIZE) {
+    canvas_char_map[paint_buffer][y][x++] = *str++;
+  }
 }

@@ -134,8 +134,8 @@ void uart1_dma_rx_start(void)
 
     LL_USART_EnableDMAReq_RX(USART1);
 
-    NVIC_SetPriority(DMA2_Channel1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 1, 0));
-    NVIC_EnableIRQ(DMA2_Channel1_IRQn);
+    NVIC_SetPriority(DMA2_Channel3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 1, 0));
+    NVIC_EnableIRQ(DMA2_Channel3_IRQn);
 }
 
 void uart1_tx_dma(uint8_t *data, uint32_t len)

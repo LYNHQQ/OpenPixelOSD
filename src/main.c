@@ -4,6 +4,7 @@
  */
 #include "main.h"
 #include "msp_displayport.h"
+#include "mspMenu.h"
 #include "system.h"
 #include "usb.h"
 #include "video_gen.h"
@@ -23,9 +24,14 @@ extern bool new_field;
 #endif
 
 #define LED_BLINK_INTERVAL 100 // milliseconds
-#define DEBUG_LOOP_INTERVAL 100 // milliseconds
+#define DEBUG_LOOP_INTERVAL 500 // milliseconds
 
 void led_blink(void);
+
+extern volatile uint16_t sync_quality;
+extern volatile uint16_t sync_voltage;
+extern volatile uint16_t sync_noise;
+extern uint16_t video_level[];
 
 void debug_print_loop(void)
 {
@@ -33,7 +39,12 @@ void debug_print_loop(void)
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
-        // Loop debug printf here
+        //TRACE_INFO("ch0:%i ch1:%i\n",adc_read_mv(0),adc_read_mv(1)); // Loop debug printf here
+        TRACE_INFO("sync voltage:%i black: %i quality:%i noise:%i\n",
+          sync_voltage, 
+          (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
+          sync_quality, 
+          sync_noise); // Loop debug printf here
     }
 }
 
@@ -76,6 +87,8 @@ int main (void)
         msp_loop_process();
         led_blink();
         debug_print_loop();
+        msp_menu();
+        video_sync_loop();
 
 #if 0 // TODO: remove later
 // For test only - 3D cube animation
@@ -94,8 +107,10 @@ void led_blink(void)
     static uint32_t last_tick = 0;
 
     if ((HAL_GetTick() - last_tick) >= LED_BLINK_INTERVAL) {
-        LED_STATE_GPIO_Port->ODR ^= LED_STATE_Pin;
-        last_tick = HAL_GetTick();
+      #ifndef TRIGGER_LINE  
+      LED_STATE_GPIO_Port->ODR ^= LED_STATE_Pin;
+      #endif  
+      last_tick = HAL_GetTick();
     }
 }
 

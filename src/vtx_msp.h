@@ -15,9 +15,19 @@ typedef struct {
   uint8_t power;       // power index (0..N-1)
   uint8_t pitmode;     // 0/1
   uint8_t vtx_table_available;
+  uint8_t configSet;
 } vtx_config_t;
 
 const vtx_config_t* vtx_get_config(void);
+const char* vtx_get_band_name(uint8_t band);
+uint8_t vtx_get_band_count(void);
+uint8_t vtx_get_power_count(void);
+uint16_t vtx_get_power_mw(void);
+uint16_t vtx_get_frequency(uint8_t band, uint8_t channel);
+void vtx_set_pitmode(uint8_t pitmode);
+void vtx_set_band_channel(int8_t band, uint8_t channel);
+void vtx_set_power(int8_t power);
+
 bool vtx_msp_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload);
 void vtx_msp_request_config(uint8_t owner);
 
@@ -25,5 +35,6 @@ void vtx_msp_clear_table_and_set_defaults(uint8_t owner);
 void vtx_msp_push_power_table(uint8_t owner);
 void vtx_msp_push_band_table(uint8_t owner);
 void vtx_msp_eeprom_write(uint8_t owner);
+void vtx_msp_send_command(uint8_t owner, uint8_t command);
 
 #endif //VTX_MSP_H

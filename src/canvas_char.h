@@ -11,6 +11,7 @@ EXEC_RAM void canvas_char_flush_map(void);
 EXEC_RAM void canvas_char_clean(void);
 EXEC_RAM void canvas_char_write(uint8_t x, uint8_t y, const char *data, const uint16_t len);
 EXEC_RAM void canvas_char_draw_complete(void);
+EXEC_RAM void canvas_print(uint8_t x, uint8_t y, const char *str);
 
 
 #endif //CANVAS_CHAR_H

@@ -23,10 +23,10 @@ void OPAMP1_Init(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(OPAMP1_VOUT_VIDEO_OUT_GPIO_Port, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = OPAMP1_VINPIO2_VIDEO_IN_Pin;
+    GPIO_InitStruct.Pin = OPAMP1_VINPIO2_VIDEO1_IN_Pin;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-    LL_GPIO_Init(OPAMP1_VINPIO2_VIDEO_IN_GPIO_Port, &GPIO_InitStruct);
+    LL_GPIO_Init(OPAMP1_VINPIO2_VIDEO1_IN_GPIO_Port, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = OPAMP1_VINPIO0_VIDEO2_IN_Pin;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;

@@ -152,6 +152,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/stm32g4xx/syscalls.c
         ./src/stm32g4xx/system.c
         ./src/msp/msp.c
+        ./src/msp/mspMenu.c
         ./src/gpio.c
         ./src/dac.c
         ./src/adc.c

@@ -136,29 +136,6 @@ void TIM2_Init(void)
     #endif
 }
 
-void TIM4_Init(void)
-{
-    LL_TIM_InitTypeDef TIM_InitStruct = {0};
-
-    /* Peripheral clock enable */
-    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM4);
-
-    /* TIM4 interrupt Init */
-    NVIC_SetPriority(TIM4_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),15, 0));
-    NVIC_EnableIRQ(TIM4_IRQn);
-
-    TIM_InitStruct.Prescaler = 16999;
-    TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-    TIM_InitStruct.Autoreload = 9999;
-    TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
-    LL_TIM_Init(TIM4, &TIM_InitStruct);
-    LL_TIM_EnableARRPreload(TIM4);
-    LL_TIM_SetClockSource(TIM4, LL_TIM_CLOCKSOURCE_INTERNAL);
-    LL_TIM_SetTriggerOutput(TIM4, LL_TIM_TRGO_RESET);
-    LL_TIM_DisableMasterSlaveMode(TIM4);
-}
-
-
 void TIM7_Init(void)
 {
     LL_TIM_InitTypeDef TIM_InitStruct = {0};

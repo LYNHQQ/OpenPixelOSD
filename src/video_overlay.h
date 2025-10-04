@@ -6,5 +6,6 @@
 #define VIDEO_OVERLAY_H
 
 void video_overlay_init(void);
+void video_sync_loop(void);
 
 #endif //VIDEO_OVERLAY_H

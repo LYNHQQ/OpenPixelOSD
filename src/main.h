@@ -90,13 +90,15 @@ typedef enum {
 
 #define OPAMP1_VOUT_VIDEO_OUT_Pin               LL_GPIO_PIN_2
 #define OPAMP1_VOUT_VIDEO_OUT_GPIO_Port         GPIOA
-#define OPAMP1_VINPIO0_VIDEO2_IN_Pin            LL_GPIO_PIN_1
-#define OPAMP1_VINPIO0_VIDEO2_IN_GPIO_Port      GPIOA
-#define OPAMP1_VINPIO2_VIDEO_IN_Pin             LL_GPIO_PIN_7
-#define OPAMP1_VINPIO2_VIDEO_IN_GPIO_Port       GPIOA
 
-#define COMP_INP_VIDEO_SYNC_IN_Pin              LL_GPIO_PIN_0
-#define COMP_INP_VIDEO_SYNC_IN_GPIO_Port        GPIOA
+#define OPAMP1_VINPIO0_VIDEO2_IN_Pin            LL_GPIO_PIN_3
+#define OPAMP1_VINPIO0_VIDEO2_IN_GPIO_Port      GPIOA
+
+#define OPAMP1_VINPIO2_VIDEO1_IN_Pin            LL_GPIO_PIN_7
+#define OPAMP1_VINPIO2_VIDEO1_IN_GPIO_Port      GPIOA
+
+//#define COMP_INP_VIDEO_SYNC_IN_Pin              LL_GPIO_PIN_3
+//#define COMP_INP_VIDEO_SYNC_IN_GPIO_Port        GPIOA
 
 #define SPI2_CS_Pin                             LL_GPIO_PIN_14
 #define SPI2_CS_GPIO_Port                       GPIOB
@@ -105,9 +107,9 @@ typedef enum {
 #define SPI2_MOSI_Pin                           LL_GPIO_PIN_15
 #define SPI2_MOSI_GPIO_Port                     GPIOB
 
-#define USER_KEY_Pin                            LL_GPIO_PIN_13
+#define USER_KEY_Pin                            LL_GPIO_PIN_15
 #define USER_KEY_GPIO_Port                      GPIOC
-#define LED_STATE_Pin                           LL_GPIO_PIN_6
+#define LED_STATE_Pin                           LL_GPIO_PIN_14
 #define LED_STATE_GPIO_Port                     GPIOC
 #define BOOT_KEY_Pin                            LL_GPIO_PIN_8
 #define BOOT_KEY_GPIO_Port                      GPIOB
@@ -122,9 +124,34 @@ typedef enum {
 #define DAC8BIT_TO_MV(value)                    (((uint32_t)(value) * 3300) / 255)
 #define DAC8BIT_FROM_MV(mV)                     (((uint32_t)(mV) * 255) / 3300)
 
-#define VIDE_DETECTION_MV                       (DAC12BIT_FROM_MV(350)) // 250 mV for video detection
+#define SYNC_START_MV                           250
+#define SYNC_SCAN_MIN_MV                        50
+#define SYNC_SCAN_MAX_MV                        700
+#define SYNC_SCAN_INC_MV                        20
+#define SYNC_TO_BLACK_MIN_MV                    150
+
+#define SYNC_QUALITY_THRESHOLD                  5
+#define SYNC_NOISE_THRESHOLD                    10
+#define SYNC_LOST_FRAMES_THRESHOLD              50
 
 #define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
+
+#define VIDEO_INPUT                             2
+
+#define VIDEO1_INPUT_GAIN                       1
+#define VIDEO2_INPUT_GAIN                       2
+#define VIDEO_TOTAL_GAIN                        2
+
+
+#if VIDEO_INPUT == 1
+#define VIDEO_SYNC_COMP_IMPUT                   LL_COMP_INPUT_PLUS_IO1
+#define VIDOE_OPAMP_IMPUT                       OPAMP_CONST_IO2
+#define VIDEO_INPUT_GAIN                        VIDEO1_INPUT_GAIN
+#else
+#define VIDEO_SYNC_COMP_IMPUT                   LL_COMP_INPUT_PLUS_IO2
+#define VIDOE_OPAMP_IMPUT                       OPAMP_CONST_IO1
+#define VIDEO_INPUT_GAIN                        VIDEO2_INPUT_GAIN
+#endif
 
 void gpio_init(void);
 void adc_init(void);
@@ -146,7 +173,6 @@ void OPAMP6_Init(void);
 void TIM1_Init(void);
 void TIM2_Init(void);
 void TIM3_Init(void);
-void TIM4_Init(void);
 void TIM7_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);

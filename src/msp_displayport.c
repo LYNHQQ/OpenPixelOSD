@@ -14,7 +14,7 @@
 
 #if defined(BUILD_VARIANT_VTX)
 #include "vtx_msp.h"
-#define MSP_REQUEST_LOOP_INTERVAL 1000
+#define MSP_REQUEST_LOOP_INTERVAL 100u
 #endif
 
 typedef enum {
@@ -31,6 +31,10 @@ extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
 extern bool show_logo;
 
+extern uint8_t fcArmed;
+extern uint16_t rcChannel[4];
+extern uint8_t stickPos;
+
 CCMRAM_BSS static msp_port_t msp_uart = {0};
 CCMRAM_BSS static msp_port_t msp_usb = {0};
 EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload);
@@ -44,6 +48,18 @@ void msp_displayport_init(void)
 
     msp_usb.callback = msp_callback;
     msp_usb.owner = MSP_OWNER_USB;
+}
+
+uint8_t mspStickpos(void) {
+  uint8_t result = 0;
+  for (uint8_t i = 0; i < 4; i++) {
+    result >>= 2;
+    if      (rcChannel[i] > 500   && rcChannel[i] < 1250  ) result |= 0x40;
+    else if (rcChannel[i] >= 1250 && rcChannel[i] <= 1750 ) result |= 0x00;
+    else if (rcChannel[i] > 1750  && rcChannel[i] < 2500  ) result |= 0x80;
+    else result |= 0xc0;
+  }
+  return result;
 }
 
 EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
@@ -125,20 +141,39 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
 #endif
         }
             break;
+        case MSP_STATUS:
+          if ( !fcArmed && (payload[6] & 0x01)) {
+              TRACE_INFO("FC ARMED\n");
+              fcArmed = 1;
+          } else if ( fcArmed && !(payload[6] & 0x01)) {
+              TRACE_INFO("FC DISARMED\n");
+              fcArmed = 0;
+          }
+          break;
+        case MSP_RC:
+          memcpy(rcChannel, (uint16_t*)payload, sizeof(rcChannel));
+          stickPos = mspStickpos();
 
+          //TRACE_INFO_WP("RC received %02x: ", mspStickpos());
+          //for(uint8_t x = 0; x<4; x++) {
+          //  TRACE_INFO_WP("%i ", rcChannel[x]) }
+          //TRACE_INFO_WP("\r");
+
+          break;
         default:
             printf("MSP command not parsed %d:0x%02X\r\n",msp_cmd, msp_cmd);
             break;
         }
         break;
-        case MSP_V2_OVER_V1:
-            break;
-        case MSP_V2_NATIVE:
-            break;
-        default:
-            break;
-    }
-
+        
+      }
+      break;
+    case MSP_V2_OVER_V1:
+        break;
+    case MSP_V2_NATIVE:
+        break;
+    default:
+        break;
 #if 0 // debug msp via usb-cdc
     for(int i = 0; i < data_size; i++) {
         printf("0x%02x ", payload[i]);
@@ -162,9 +197,25 @@ EXEC_RAM void msp_loop_process(void)
 #if defined(BUILD_VARIANT_VTX)
     static uint32_t last_tick = 0;
     static bool resp = true;
-    if ((HAL_GetTick() - last_tick) >= MSP_REQUEST_LOOP_INTERVAL && resp) {
+    static uint8_t c = 0;
+    if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL + (1 - fcArmed) * 5) && resp) {
         last_tick = HAL_GetTick();
-        vtx_msp_request_config(MSP_OWNER_UART);
+        switch(c) {
+          case 0:
+          case 2:
+            vtx_msp_send_command(MSP_OWNER_UART, MSP_RC);
+            c++;
+            break;
+          case 1:
+            vtx_msp_send_command(MSP_OWNER_UART, MSP_STATUS);
+            c = c + (1 - fcArmed);
+            break;
+          case 3:
+            //vtx_msp_request_config(MSP_OWNER_UART);
+            c = 0;
+            break;
+        }
+        
     }
 #endif
 }

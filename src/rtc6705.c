@@ -194,34 +194,6 @@ static inline uint32_t make_frame(uint8_t addr4, uint8_t rw, uint32_t data20)
 
 
 /**
- * @brief Initialize GPIO clocks and idle levels for RTC6705 bit-bang interface.
- * Call this once before any read/write. Make sure SPI2 peripheral is disabled on these pins.
- */
-bool rtc6705_init(void)
-{
-    SDIO_OUT();
-    SCLK_OUT();
-    LE_OUT();
-
-    // Idle levels: SCLK=0, LE=0, SDIO=0
-    SCLK_WR(0);
-    LE_WR(0);
-    SDIO_WR(0);
-
-    if (rtc6705_detect() == false) {
-        return false;
-    }
-    // Program default R (optional but explicit)
-    rtc6705_write_reg(RTC6705_REG_SYN_A, (RTC6705_R_DIV & SYNA_R_MASK));
-
-    // Capture REG 0x07 power-on value and cache it (guard writes later).
-    g_reg7_poweron = rtc6705_read_reg(RTC6705_REG_VCO3) & 0xFFFFFu;
-    g_reg7_cached = g_reg7_poweron;
-
-    return true;
-}
-
-/**
  * @brief Write 20-bit value to 4-bit register address.
  * @param addr4  lower 4 bits used
  * @param data20 lower 20 bits used
@@ -278,10 +250,44 @@ static uint32_t rtc6705_get_state_raw(void)
     return rtc6705_read_reg(RTC6705_REG_STATE) & 0xFFFFFu;
 }
 
-__attribute__((unused))
 static uint8_t rtc6705_get_state3(void)
 {
     return (uint8_t)(rtc6705_get_state_raw() & 0x7u);
+}
+
+/**
+ * @brief Initialize GPIO clocks and idle levels for RTC6705 bit-bang interface.
+ * Call this once before any read/write. Make sure SPI2 peripheral is disabled on these pins.
+ */
+bool rtc6705_init(void)
+{
+    SDIO_OUT();
+    SCLK_OUT();
+    LE_OUT();
+
+    // Idle levels: SCLK=0, LE=0, SDIO=0
+    SCLK_WR(0);
+    LE_WR(0);
+    SDIO_WR(0);
+
+    if (rtc6705_detect() == false) {
+        return false;
+    }
+
+    //Wait while RTC6705 power on
+    uint8_t c = 200;
+    while (c-- && (rtc6705_get_state3() == 0x01)) {
+      LL_mDelay(25);
+    }
+
+    // Program default R (optional but explicit)
+    rtc6705_write_reg(RTC6705_REG_SYN_A, (RTC6705_R_DIV & SYNA_R_MASK));
+
+    // Capture REG 0x07 power-on value and cache it (guard writes later).
+    g_reg7_poweron = rtc6705_read_reg(RTC6705_REG_VCO3) & 0xFFFFFu;
+    g_reg7_cached = g_reg7_poweron;
+
+    return true;
 }
 
 /** Wait until STATE register readings are stable for a short window.

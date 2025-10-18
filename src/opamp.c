@@ -42,20 +42,6 @@ void OPAMP1_Init(void)
     LL_OPAMP_SetTrimmingMode(OPAMP1, LL_OPAMP_TRIMMING_FACTORY);
 }
 
-void OPAMP3_Init(void)
-{
-    LL_OPAMP_InitTypeDef OPAMP_InitStruct = {0};
-
-    OPAMP_InitStruct.PowerMode = LL_OPAMP_POWERMODE_NORMALSPEED;
-    OPAMP_InitStruct.FunctionalMode = LL_OPAMP_MODE_PGA;
-    OPAMP_InitStruct.InputNonInverting = LL_OPAMP_INPUT_NONINVERT_IO2;
-    OPAMP_InitStruct.InputInverting = LL_OPAMP_INPUT_INVERT_CONNECT_NO;
-    LL_OPAMP_Init(OPAMP3, &OPAMP_InitStruct);
-    LL_OPAMP_SetInputsMuxMode(OPAMP3, LL_OPAMP_INPUT_MUX_DISABLE);
-    LL_OPAMP_SetInternalOutput(OPAMP3, LL_OPAMP_INTERNAL_OUPUT_DISABLED);
-    LL_OPAMP_SetPGAGain(OPAMP3, LL_OPAMP_PGA_GAIN_2_OR_MINUS_1);
-    LL_OPAMP_SetTrimmingMode(OPAMP3, LL_OPAMP_TRIMMING_FACTORY);
-}
 
 #if defined(ALPHA_CHANNEL) && defined(STM32G474xx)
 void OPAMP6_Init(void)

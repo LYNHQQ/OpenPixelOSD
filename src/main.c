@@ -12,6 +12,7 @@
 #if defined(BUILD_VARIANT_VTX)
 #include "rtc6705.h"
 #include <rf_pa.h>
+#include "vtx_msp.h"
 #endif
 #include <stdio.h>
 #ifdef TRACE_LEVEL
@@ -24,7 +25,7 @@ extern bool new_field;
 #endif
 
 #define LED_BLINK_INTERVAL 100 // milliseconds
-#define DEBUG_LOOP_INTERVAL 500 // milliseconds
+#define DEBUG_LOOP_INTERVAL 2500 // milliseconds
 
 void led_blink(void);
 
@@ -33,21 +34,24 @@ extern volatile uint16_t sync_voltage;
 extern volatile uint16_t sync_noise;
 extern uint16_t video_level[];
 
+extern double rf_detector;
+
 void debug_print_loop(void)
 {
     static uint32_t last_tick = 0;
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
+        uint16_t rf_detect_int = rf_detector;
         //TRACE_INFO("ch0:%i ch1:%i\n",adc_read_mv(0),adc_read_mv(1)); // Loop debug printf here
-        TRACE_INFO("sync voltage:%i black: %i quality:%i noise:%i\n",
+        TRACE_INFO("sync voltage:%i black: %i quality:%i noise:%i adc_1:%i\n",
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
           sync_quality, 
-          sync_noise); // Loop debug printf here
+          sync_noise,
+          rf_detect_int); // Loop debug printf here
     }
 }
-
 
 int main (void)
 {
@@ -56,8 +60,8 @@ int main (void)
     #ifdef USE_SWO
     SWO_Init();
     TRACE_INFO_WP("\n");
-    TRACE_INFO("Getting new Started Project --\r");
-    TRACE_INFO("Compiled: %s %s --\r", __DATE__, __TIME__);
+    TRACE_INFO("Getting new Started Project --\n");
+    TRACE_INFO("Compiled: %s %s --\n", __DATE__, __TIME__);
     #endif
     gpio_init();
     usb_init();
@@ -73,12 +77,10 @@ int main (void)
     msp_displayport_init();
 
 #if defined(BUILD_VARIANT_VTX)
+    rf_pa_init();
     if(rtc6705_init()) {
         printf("rtc6705 detected\r\n");
-        rtc6705_set_frequency(5880); // TODO: remove after implementing configuration saving to flash
-
-        rf_pa_init();
-        rf_pa_set_power_level(RF_PA_PWR_20mW);
+        vtx_set_power(RF_PA_PWR_20mW);
     }
 #endif
 
@@ -89,6 +91,7 @@ int main (void)
         debug_print_loop();
         msp_menu();
         video_sync_loop();
+        rf_pa_loop();
 
 #if 0 // TODO: remove later
 // For test only - 3D cube animation

@@ -80,8 +80,8 @@ typedef enum {
  * R3: reserved
  */
 typedef enum {
-  ADC_CH_RESERVED = 0,
-  ADC_CH_PA_VDET = 1,
+  ADC_CH_PA_VDET = 0,
+  ADC_CH_VCC5 = 1,
   ADC_CH_TEMP = 2,
   ADC_CH_VREF_INT  = 3, // internal VREFINT
   ADC_CH_COUNT
@@ -100,11 +100,11 @@ typedef enum {
 //#define COMP_INP_VIDEO_SYNC_IN_Pin              LL_GPIO_PIN_3
 //#define COMP_INP_VIDEO_SYNC_IN_GPIO_Port        GPIOA
 
-#define SPI2_CS_Pin                             LL_GPIO_PIN_14
+#define SPI2_CS_Pin                             LL_GPIO_PIN_7
 #define SPI2_CS_GPIO_Port                       GPIOB
-#define SPI2_SCK_Pin                            LL_GPIO_PIN_13
+#define SPI2_SCK_Pin                            LL_GPIO_PIN_6
 #define SPI2_SCK_GPIO_Port                      GPIOB
-#define SPI2_MOSI_Pin                           LL_GPIO_PIN_15
+#define SPI2_MOSI_Pin                           LL_GPIO_PIN_9
 #define SPI2_MOSI_GPIO_Port                     GPIOB
 
 #define USER_KEY_Pin                            LL_GPIO_PIN_15
@@ -124,9 +124,9 @@ typedef enum {
 #define DAC8BIT_TO_MV(value)                    (((uint32_t)(value) * 3300) / 255)
 #define DAC8BIT_FROM_MV(mV)                     (((uint32_t)(mV) * 255) / 3300)
 
-#define SYNC_START_MV                           250
-#define SYNC_SCAN_MIN_MV                        50
-#define SYNC_SCAN_MAX_MV                        700
+#define SYNC_START_MV                           350
+#define SYNC_SCAN_MIN_MV                        100
+#define SYNC_SCAN_MAX_MV                        800
 #define SYNC_SCAN_INC_MV                        20
 #define SYNC_TO_BLACK_MIN_MV                    150
 
@@ -167,7 +167,6 @@ void DAC3_Init(void);
 void dma_init(void);
 
 void OPAMP1_Init(void);
-void OPAMP3_Init(void);
 void OPAMP6_Init(void);
 
 void TIM1_Init(void);

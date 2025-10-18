@@ -11,6 +11,7 @@
 #include "msp.h"
 #include "uart.h"
 #include "usb.h"
+#include "rf_pa.h"
 
 #if defined(BUILD_VARIANT_VTX)
 #include "vtx_msp.h"
@@ -38,6 +39,10 @@ extern uint8_t stickPos;
 CCMRAM_BSS static msp_port_t msp_uart = {0};
 CCMRAM_BSS static msp_port_t msp_usb = {0};
 EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload);
+
+uint16_t debug0;
+uint16_t debug1;
+
 
 void msp_displayport_init(void)
 {
@@ -136,7 +141,9 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
             vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
             const vtx_config_t *vtx_config = vtx_get_config();
             if (!vtx_config->vtx_table_available) {
+                TRACE_INFO("Set Table defaults\n");
                 vtx_msp_clear_table_and_set_defaults(owner);
+                
             }
 #endif
         }
@@ -151,15 +158,37 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
           }
           break;
         case MSP_RC:
-          memcpy(rcChannel, (uint16_t*)payload, sizeof(rcChannel));
-          stickPos = mspStickpos();
+            memcpy(rcChannel, (uint16_t*)payload, sizeof(rcChannel));
+            stickPos = mspStickpos();
+            break;
+        case MSP_DEBUG:
+            debug0 = payload[0] + (uint16_t)(payload[1]<<8);
+            debug1 = (uint16_t)payload[2];
+            TRACE_INFO("target_debug %04x %04x\n", debug0, debug1);
+            switch (debug1) {
+              case 0:
+                rf_pa_set_vref_mv(debug0);
+                break;
+              case 1:
+                
+                break;
+              case 2:
 
-          //TRACE_INFO_WP("RC received %02x: ", mspStickpos());
-          //for(uint8_t x = 0; x<4; x++) {
-          //  TRACE_INFO_WP("%i ", rcChannel[x]) }
-          //TRACE_INFO_WP("\r");
+                break;
+              case 3:
 
-          break;
+                break;
+              case 4:
+
+                break;
+              case 5:
+                vtx_msp_clear_table_and_set_defaults(MSP_OWNER_UART);
+                break;
+
+              default:
+                break;
+            }
+            break;
         default:
             printf("MSP command not parsed %d:0x%02X\r\n",msp_cmd, msp_cmd);
             break;
@@ -171,6 +200,19 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
     case MSP_V2_OVER_V1:
         break;
     case MSP_V2_NATIVE:
+        switch(msp_cmd) {
+          case MSP_PACALTABLE:
+          case MSP_SET_PACALTABLE:
+          case MSP_PACALIBRATION:
+          case MSP_SET_PACALIBRATION:
+#if defined(BUILD_VARIANT_VTX)
+            vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
+#endif
+            break;
+          default:
+            printf("MSP V2 command not parsed %d:0x%02X\r\n",msp_cmd, msp_cmd);
+            break;
+        }
         break;
     default:
         break;
@@ -211,7 +253,7 @@ EXEC_RAM void msp_loop_process(void)
             c = c + (1 - fcArmed);
             break;
           case 3:
-            //vtx_msp_request_config(MSP_OWNER_UART);
+            if (!vtx_get_config()->configSet) vtx_msp_request_config(MSP_OWNER_UART);
             c = 0;
             break;
         }

@@ -16,11 +16,26 @@ typedef enum {
   RF_PA_PWR_COUNT
 } rf_pa_power_t;
 
+#define POWER_LABEL_LENGTH      3
+
+typedef struct {
+    uint16_t mW;
+    uint8_t label[3];
+    uint8_t rtcPA;
+    uint16_t calibration[7];
+    uint16_t detector[7];
+} powerTable_t;
+
+extern powerTable_t powerTable[];
+
+uint8_t rf_pa_power_count(void);
 void rf_pa_init(void);
 void rf_pa_enable(bool on);
 uint16_t rf_pa_read_vdet_mv(void);
 uint16_t rf_pa_get_vref_mv(void);
 void rf_pa_set_vref_mv(uint16_t mv);
+void rf_pa_set_calibration(uint16_t mv);
 uint16_t rf_pa_set_power_level(rf_pa_power_t level);
+void rf_pa_loop(void);
 
 #endif //RF_PA_H

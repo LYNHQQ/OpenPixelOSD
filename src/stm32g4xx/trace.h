@@ -177,7 +177,7 @@ extern int printf(const char* format, ...);
 #endif
 
 #if (TRACE_LEVEL >= TRACE_LEVEL_ERROR)
-#define TRACE_ERROR(...)      {printf_"-E- " __VA_ARGS__); }
+#define TRACE_ERROR(...)      {printf("-E- " __VA_ARGS__); }
 #define TRACE_ERROR_WP(...)   {printf(__VA_ARGS__); }
 #else
 #define TRACE_ERROR(...)      { }

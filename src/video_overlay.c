@@ -134,7 +134,6 @@ void video_overlay_init(void)
     TIM17_Init(); // TIM17 for video generator
     COMP2_Init(); // COMP2 for video sync detection
     //COMP3_Init(); // COMP3 for video sync detection
-    OPAMP3_Init();
     
 #if defined(ALPHA_CHANNEL) && defined(STM32G474xx)
     OPAMP6_Init();

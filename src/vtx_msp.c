@@ -11,6 +11,7 @@
 #include "rtc6705.h"
 #include "uart.h"
 #include "usb.h"
+#include "rf_pa.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -27,10 +28,6 @@ typedef struct {
     uint8_t band_name[VTX_CH_LABEL_COUNT];  /* shown in BF “Name”, exactly 8 bytes */
     uint16_t freq[VTX_CHANNEL_COUNT];       /* ch1..ch8, MHz */
 } vtx_band_t;
-
-/* Power levels table (index -> mW). Tune for your HW */
-static const uint16_t g_power_mw[] = { 25, 100, 200, 800 };
-#define NUM_PWR (sizeof(g_power_mw)/sizeof(g_power_mw[0]))
 
 /* VTX bands table (letter + 8-char name + 8 channel freqs (MHz)).
  * These are standard bands used in Betaflight and iNav.
@@ -61,10 +58,10 @@ static const vtx_band_t g_bands[] = {
 static vtx_config_t g_cfg = {
     .band = 5,
     .channel = 1,
-    .frequency = 5658,
+    .frequency = 5800,
     .power = 1,
     .pitmode = 0,
-    .configSet =0,
+    .configSet = 0,
 };
 
 /* ------------------------- MSP payload definitions -------------------------- */
@@ -107,14 +104,9 @@ uint8_t vtx_get_band_count(void)
     return NUM_BANDS;
 }
 
-uint8_t vtx_get_power_count(void)
-{
-    return NUM_PWR;
-}
-
 uint16_t vtx_get_power_mw(void)
 {
-    return g_power_mw[g_cfg.power];
+    return powerTable[g_cfg.power].mW;
 }
 
 uint16_t vtx_get_frequency(uint8_t band, uint8_t channel)
@@ -159,25 +151,9 @@ void vtx_set_power(int8_t power)
     vtx_apply_hw(&g_cfg);
 }
 
-/* -------------------- Hardware apply: RTC6705 + rf_pa ----------------------- */
-/* NOTE:
- * - RTC6705 power has coarse steps (3/7/11/13 dBm). For external PA you
- *   currently drive only VREF (enable) and use detector for telemetry.
- * - Here we only set frequency and pick a coarse internal PA level from power index.
- */
-static rtc6705_power_t map_power_to_rtc6705(uint8_t powerIndex)
-{
-    /* Simple mapping: 25mW→7dBm, 100mW→11dBm, 200/800mW→13dBm (coarse) */
-    if (powerIndex == 0) return RTC6705_PA_3dBm;
-    if (powerIndex == 1) return RTC6705_PA_7dBm;
-    if (powerIndex == 2) return RTC6705_PA_11dBm;
-    if (powerIndex == 3) return RTC6705_PA_13dBm;
-    return RTC6705_PA_13dBm;
-}
-
 static void vtx_apply_hw(const vtx_config_t *cfg)
 {
-    printf("vtx_apply_hw: band=%d ch=%d freq=%d power=%d pit=%d\r\n",
+    printf("vtx_apply_hw: band=%d ch=%d freq=%d power=%d pit=%d\n",
            cfg->band, cfg->channel, cfg->frequency, cfg->power, cfg->pitmode);
 
     /* Program synthesizer frequency (MHz) */
@@ -197,11 +173,11 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
     } else {
         /* Set internal RTC6705 PA power */
         rtc6705_allow_power_writes(true);
-        rtc6705_set_power(map_power_to_rtc6705(cfg->power));
+        rtc6705_set_power(powerTable[cfg->power].rtcPA);
         rtc6705_allow_power_writes(false);
 
         /* Set external RF Power Amplifier */
-        rf_pa_set_power_level(cfg->power+1);
+        rf_pa_set_power_level(cfg->power);
     }
 }
 
@@ -249,25 +225,29 @@ static void handle_msp_set_vtx_config(uint8_t owner, const uint8_t *payload, uin
         return; // ignore if no VTX table
     }
 
-    /* Normalize power: Betaflight uses 1-based power indices. */
-    int power_idx = (power_1based > 0) ? ((int)power_1based - 1) : 0;
 
     /* If LPD is active, force the lowest power level. */
     if (low_power_disarm) {
-        power_idx = 0;
+        power_1based = 1;
     }
 
     /* Clamp power index to our table */
-    if (power_idx < 0) power_idx = 0;
-    if ((unsigned)power_idx >= NUM_PWR) power_idx = (int)NUM_PWR - 1;
+    if (power_1based < 1) power_1based = 1;
+    if ((unsigned)power_1based > rf_pa_power_count()) power_1based = (int)rf_pa_power_count();
 
     /* Update runtime config */
     g_cfg.pitmode = pitmode ? 1 : 0;
-    g_cfg.power = (uint8_t)power_idx;
+    g_cfg.power = (uint8_t)power_1based;
 
-    g_cfg.frequency = freq_mhz;
     g_cfg.channel = ch_raw;
     g_cfg.band = band_raw;
+
+    if(band_raw) {
+      g_cfg.frequency = g_bands[band_raw - 1].freq[ch_raw - 1];
+    } else {
+      g_cfg.frequency = freq_mhz;
+    }
+    
     g_cfg.vtx_table_available = vtx_table_available;
     g_cfg.configSet = 1;
     
@@ -313,15 +293,15 @@ static inline void msp_tx_send_owner(uint8_t owner, const uint8_t *buf, uint16_t
 
 void vtx_msp_clear_table_and_set_defaults(uint8_t owner)
 {
-    if (g_cfg.vtx_table_available == 1) {
-        return; // VTX table already present, do nothing
-    }
+    //if (g_cfg.vtx_table_available == 1) {
+    //    return; // VTX table already present, do nothing
+    //}
 
     // Reset VTX table to defaults
     uint8_t p[15] = {0};
     p[0]  = 0;                          /* idx LSB (legacy BF field, keep 0) */
     p[1]  = 0;                          /* idx MSB */
-    p[2]  = (uint8_t)(NUM_PWR);         /* power index */
+    p[2]  = 1;                          /* power index */
     p[3]  = 0;                          /* pitmode (0/1) */
     p[4]  = 0;                          /* lowPowerDisarm */
     p[5]  = 0; p[6]  = 0;               /* pitModeFreq (LSB/MSB), 0 if unused */
@@ -330,7 +310,7 @@ void vtx_msp_clear_table_and_set_defaults(uint8_t owner)
     p[9]  = 0; p[10] = 0;               /* newFreq LSB/MSB, 0 => use band/channel */
     p[11] = (uint8_t)(NUM_BANDS);       /* newBandCount: BF expects "6"*/
     p[12] = VTX_CHANNEL_COUNT;          /* newChannelCount (8) */
-    p[13] = (uint8_t)(NUM_PWR);         /* newPowerCount: */
+    p[13] = rf_pa_power_count();        /* newPowerCount: */
     p[14] = 1;                          /* vtx table should be cleared */
 
     uint8_t tx_buff[64];
@@ -353,25 +333,22 @@ void vtx_msp_clear_table_and_set_defaults(uint8_t owner)
  */
 void vtx_msp_push_power_table(uint8_t owner)
 {
-    for (uint8_t i = 0; i < NUM_PWR; i++) {
-        const uint8_t idx1 = (uint8_t)(i + 1);
-        const uint16_t mw  = g_power_mw[i];
-
-        char label[16] = {0};
-        uint8_t label_len = (uint8_t)snprintf(label, sizeof(label), "%u", (unsigned)mw);
-        if (label_len > 15) label_len = 15;
+    for (uint8_t i = 1; i <= rf_pa_power_count(); i++) {
+        const uint16_t mw  = powerTable[i].mW;
 
         uint8_t p[1 + 2 + 1 + 16] = {0};
-        p[0] = idx1;
+        p[0] = i;
         p[1] = (uint8_t)(mw & 0xFF);
         p[2] = (uint8_t)((mw >> 8) & 0xFF);
-        p[3] = label_len;
-        memcpy(&p[4], label, label_len);
+        p[3] = sizeof(powerTable[i].label);
+        for(uint8_t c = 0; c < p[3]; c++) {
+          p[4 + c] = powerTable[i].label[c];
+        }
 
         uint8_t tx_buff[64];
         const uint16_t len = construct_msp_command_v1(tx_buff,
                             MSP_SET_VTXTABLE_POWERLEVEL,
-                            p, (uint8_t)(4 + label_len),
+                            p, (uint8_t)(4 + p[3]),
                             MSP_OUTBOUND);
 
         msp_tx_send_owner(owner, tx_buff, len);
@@ -415,6 +392,117 @@ void vtx_msp_push_band_table(uint8_t owner)
     }
 }
 
+void vtx_msp_push_calibration_table(uint8_t owner)
+{
+    for (uint8_t i = 0; i <= rf_pa_power_count(); i++) {
+        const uint16_t mw  = powerTable[i].mW;
+
+        uint8_t p[1 + 2 + 1 + 32] = {0};
+        p[0] = i;
+        p[1] = (uint8_t)(mw & 0xFF);
+        p[2] = (uint8_t)((mw >> 8) & 0xFF);
+        for(uint8_t c = 0; c < 7; c++) {
+          p[3 + (c * 2)] = (uint8_t)(powerTable[i].calibration[c] & 0xFF);
+          p[4 + (c * 2)] =(uint8_t)((powerTable[i].calibration[c] >> 8) & 0xFF);
+        }
+        for(uint8_t c = 0; c < 7; c++) {
+          p[17 + (c * 2)] = (uint8_t)(powerTable[i].detector[c] & 0xFF);
+          p[18 + (c * 2)] = (uint8_t)((powerTable[i].detector[c] >> 8) & 0xFF);
+        }
+
+        uint8_t tx_buff[64];
+        const uint16_t len = construct_msp_command_v2(tx_buff,
+                            MSP_SET_PACALTABLE,
+                            p, (uint8_t)(3 + 14 + 14),
+                            MSP_OUTBOUND);
+
+        msp_tx_send_owner(owner, tx_buff, len);
+    }
+}
+
+void vtx_msp_set_calibration_table(uint8_t owner, const uint8_t *payload, uint16_t data_size)
+{
+        if (!payload || data_size < 17) {
+            return; // malformed
+        }
+        (void)owner;
+
+        const uint16_t level  = payload[0];
+
+        if (!level || level > rf_pa_power_count()) {
+            return;
+        }
+
+        TRACE_INFO("SET PA table %i\n", level);
+
+        for(uint8_t c = 0; c < 7; c++) {
+          uint16_t pa_mv = payload[3 + (c * 2)] + (uint16_t)(payload[4 + (c * 2)]<<8);
+          powerTable[level].calibration[c] = pa_mv;
+        }
+
+        if ( data_size >= 31) {
+           for(uint8_t c = 0; c < 7; c++) {
+            uint16_t rf_detector = payload[17 + (c * 2)] + (uint16_t)(payload[18 + (c * 2)]<<8);
+            powerTable[level].detector[c] = rf_detector;
+          }  
+        }
+}
+
+extern double rf_detector;
+
+void vtx_msp_push_calibration(uint8_t owner)
+{
+    uint8_t p[5] = {0};
+    uint16_t pa_int = rf_detector;
+
+    p[0] = g_cfg.power;
+    p[1] = (uint8_t)(rf_pa_get_vref_mv() & 0xFF);
+    p[2] = (uint8_t)((rf_pa_get_vref_mv() >> 8) & 0xFF);
+    p[3] = (uint8_t)(pa_int & 0xFF);
+    p[4] = (uint8_t)((pa_int >> 8) & 0xFF);
+
+    uint8_t tx_buff[16];
+    const uint16_t len = construct_msp_command_v2(tx_buff,
+                        MSP_PACALIBRATION,
+                        p, (uint8_t)(5),
+                        MSP_OUTBOUND);
+
+    msp_tx_send_owner(owner, tx_buff, len);
+
+}
+
+void vtx_msp_set_calibration(uint8_t owner, const uint8_t *payload, uint16_t data_size)
+{
+    static uint8_t counter = 49;  
+
+    if (!payload || data_size < 3) {
+        return; // malformed
+    }
+    (void)owner;
+
+    uint8_t level = payload[0];
+    uint16_t pa_mv = payload[1] + (uint16_t)(payload[2]<<8);;
+
+    if (level && level != g_cfg.power && level <= rf_pa_power_count()) {
+      g_cfg.power = level;
+      rtc6705_allow_power_writes(true);
+      rtc6705_set_power(powerTable[g_cfg.power].rtcPA);
+      rtc6705_allow_power_writes(false);
+      TRACE_INFO("Calibration power %i\n", level);
+    }
+    
+    if (pa_mv) {
+      rf_pa_set_calibration(pa_mv);
+      LED_STATE_GPIO_Port->ODR ^= LED_STATE_Pin;
+      if(!counter--) {
+        TRACE_INFO("Calibration mv %i\n", pa_mv);
+        counter = 49;
+      }
+    }
+
+    vtx_msp_push_calibration(owner);
+}
+
 void vtx_msp_eeprom_write(uint8_t owner)
 {
     uint8_t tx_buff[64];
@@ -441,6 +529,18 @@ bool vtx_msp_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, con
     switch (msp_cmd) {
     case MSP_VTX_CONFIG:
         handle_msp_set_vtx_config(owner, payload, data_size);
+        return true;
+    
+    case MSP_PACALTABLE:
+        vtx_msp_push_calibration_table(owner);
+        return true;
+    
+    case MSP_SET_PACALIBRATION:
+        vtx_msp_set_calibration(owner, payload, data_size);
+        return true;
+
+    case MSP_SET_PACALTABLE:
+        vtx_msp_set_calibration_table(owner, payload, data_size);
         return true;
 
     case MSP_SET_VTX_CONFIG:

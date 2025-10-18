@@ -5,6 +5,12 @@
 #ifndef MSP_DISPLAYPORT_H
 #define MSP_DISPLAYPORT_H
 #include <stdint.h>
+
+#define MSP_PACALTABLE            0x4800
+#define MSP_SET_PACALTABLE        0x4801
+#define MSP_PACALIBRATION         0x4802
+#define MSP_SET_PACALIBRATION     0x4803
+
 typedef enum
 {
   MSP_OWNER_UART = 0x00,

@@ -4,6 +4,7 @@
 #include "mspMenu.h"
 #include "vtx_msp.h"
 #include "canvas_char.h"
+#include "rf_pa.h"
 
 #define OSD_MENU_TOP                2
 #define OSD_MENU_TEXT_LEFT          2
@@ -98,10 +99,10 @@ void changePower(ButtonEvent_e btn, uint8_t __attribute__((unused)) idx) {
   uint8_t power;
 
   if (btn == BTN_RIGHT)
-    power = (vtx_get_config()->power + 1) % vtx_get_power_count();
+    power = (vtx_get_config()->power + 1) % rf_pa_power_count();
   else
-    power = (vtx_get_power_count() + vtx_get_config()->power - 1) % vtx_get_power_count();
-  vtx_set_power(power);
+    power = (rf_pa_power_count() + vtx_get_config()->power - 1) % rf_pa_power_count();
+  vtx_set_power(power + 1);
 }
 
 void changePit(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__((unused)) idx) {

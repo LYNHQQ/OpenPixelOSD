@@ -12,6 +12,7 @@
 #include "uart.h"
 #include "usb.h"
 #include "rf_pa.h"
+#include "vtx_msp.h"
 
 #if defined(BUILD_VARIANT_VTX)
 #include "vtx_msp.h"
@@ -148,6 +149,7 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
 #endif
         }
             break;
+#if defined(BUILD_VARIANT_VTX)
         case MSP_STATUS:
           if ( !fcArmed && (payload[6] & 0x01)) {
               TRACE_INFO("FC ARMED\n");
@@ -188,6 +190,7 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
               default:
                 break;
             }
+#endif
             break;
         default:
             printf("MSP command not parsed %d:0x%02X\r\n",msp_cmd, msp_cmd);
@@ -205,6 +208,7 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
           case MSP_SET_PACALTABLE:
           case MSP_PACALIBRATION:
           case MSP_SET_PACALIBRATION:
+          case MSP_EEPROM_WRITE:
 #if defined(BUILD_VARIANT_VTX)
             vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
 #endif

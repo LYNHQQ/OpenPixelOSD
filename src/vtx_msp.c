@@ -12,6 +12,7 @@
 #include "uart.h"
 #include "usb.h"
 #include "rf_pa.h"
+#include "flash.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -414,7 +415,7 @@ void vtx_msp_push_calibration_table(uint8_t owner)
         const uint16_t len = construct_msp_command_v2(tx_buff,
                             MSP_SET_PACALTABLE,
                             p, (uint8_t)(3 + 14 + 14),
-                            MSP_OUTBOUND);
+                            MSP_PACKET_COMMAND);
 
         msp_tx_send_owner(owner, tx_buff, len);
     }
@@ -422,30 +423,31 @@ void vtx_msp_push_calibration_table(uint8_t owner)
 
 void vtx_msp_set_calibration_table(uint8_t owner, const uint8_t *payload, uint16_t data_size)
 {
-        if (!payload || data_size < 17) {
-            return; // malformed
-        }
-        (void)owner;
+    if (!payload || data_size < 17) {
+        return; // malformed
+    }
+    (void)owner;
 
-        const uint16_t level  = payload[0];
+    const uint16_t level  = payload[0];
 
-        if (!level || level > rf_pa_power_count()) {
-            return;
-        }
+    if (!level || level > rf_pa_power_count()) {
+        return;
+    }
 
-        TRACE_INFO("SET PA table %i\n", level);
+    TRACE_INFO("SET PA table %i\n", level);
 
+    for(uint8_t c = 0; c < 7; c++) {
+        uint16_t pa_mv = payload[3 + (c * 2)] + (uint16_t)(payload[4 + (c * 2)]<<8);
+        powerTable[level].calibration[c] = pa_mv;
+    }
+
+    if ( data_size >= 31) {
         for(uint8_t c = 0; c < 7; c++) {
-          uint16_t pa_mv = payload[3 + (c * 2)] + (uint16_t)(payload[4 + (c * 2)]<<8);
-          powerTable[level].calibration[c] = pa_mv;
-        }
-
-        if ( data_size >= 31) {
-           for(uint8_t c = 0; c < 7; c++) {
-            uint16_t rf_detector = payload[17 + (c * 2)] + (uint16_t)(payload[18 + (c * 2)]<<8);
-            powerTable[level].detector[c] = rf_detector;
-          }  
-        }
+        uint16_t rf_detector = payload[17 + (c * 2)] + (uint16_t)(payload[18 + (c * 2)]<<8);
+        powerTable[level].detector[c] = rf_detector;
+      }  
+    }
+    rf_pa_write_eeprom(level);
 }
 
 extern double rf_detector;
@@ -464,8 +466,8 @@ void vtx_msp_push_calibration(uint8_t owner)
     uint8_t tx_buff[16];
     const uint16_t len = construct_msp_command_v2(tx_buff,
                         MSP_PACALIBRATION,
-                        p, (uint8_t)(5),
-                        MSP_OUTBOUND);
+                        p, (uint8_t)(5), 
+                        MSP_PACKET_COMMAND);
 
     msp_tx_send_owner(owner, tx_buff, len);
 
@@ -541,6 +543,10 @@ bool vtx_msp_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, con
 
     case MSP_SET_PACALTABLE:
         vtx_msp_set_calibration_table(owner, payload, data_size);
+        return true;
+    
+    case MSP_EEPROM_WRITE:
+        eeprom_save();
         return true;
 
     case MSP_SET_VTX_CONFIG:

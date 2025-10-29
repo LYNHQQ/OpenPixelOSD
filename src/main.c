@@ -4,15 +4,16 @@
  */
 #include "main.h"
 #include "msp_displayport.h"
-#include "mspMenu.h"
 #include "system.h"
 #include "usb.h"
 #include "video_gen.h"
 #include "video_overlay.h"
+#include "flash.h"
 #if defined(BUILD_VARIANT_VTX)
 #include "rtc6705.h"
-#include <rf_pa.h>
+#include "rf_pa.h"
 #include "vtx_msp.h"
+#include "mspMenu.h"
 #endif
 #include <stdio.h>
 #ifdef TRACE_LEVEL
@@ -42,14 +43,13 @@ void debug_print_loop(void)
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
-        uint16_t rf_detect_int = rf_detector;
-        //TRACE_INFO("ch0:%i ch1:%i\n",adc_read_mv(0),adc_read_mv(1)); // Loop debug printf here
+        /*uint16_t rf_detect_int = rf_detector;
         TRACE_INFO("sync voltage:%i black: %i quality:%i noise:%i adc_1:%i\n",
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
           sync_quality, 
           sync_noise,
-          rf_detect_int); // Loop debug printf here
+          rf_detect_int); // Loop debug printf here*/
     }
 }
 
@@ -67,6 +67,7 @@ int main (void)
     usb_init();
     dma_init();
     adc_init();
+    flash_init();
 
     video_overlay_init();
 #if defined(HIGH_RAM)
@@ -80,7 +81,7 @@ int main (void)
     rf_pa_init();
     if(rtc6705_init()) {
         printf("rtc6705 detected\r\n");
-        vtx_set_power(RF_PA_PWR_20mW);
+        vtx_set_power(RF_PA_PWR_DEFAULT);
     }
 #endif
 
@@ -89,9 +90,11 @@ int main (void)
         msp_loop_process();
         led_blink();
         debug_print_loop();
-        msp_menu();
         video_sync_loop();
+#if defined(BUILD_VARIANT_VTX)
+        msp_menu();
         rf_pa_loop();
+#endif
 
 #if 0 // TODO: remove later
 // For test only - 3D cube animation

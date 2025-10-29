@@ -7,16 +7,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum {
-  RF_PA_PWR_OFF = 0,   // ~0 mW (PA disabled)
-  RF_PA_PWR_20mW,      // ~20 mW
-  RF_PA_PWR_100mW,     // ~100 mW
-  RF_PA_PWR_200mW,     // ~200 mW
-  RF_PA_PWR_800mW,     // ~800 mW
-  RF_PA_PWR_COUNT
-} rf_pa_power_t;
-
 #define POWER_LABEL_LENGTH      3
+#define RF_PA_PWR_OFF           0
+#define RF_PA_PWR_DEFAULT       3
 
 typedef struct {
     uint16_t mW;
@@ -29,13 +22,14 @@ typedef struct {
 extern powerTable_t powerTable[];
 
 uint8_t rf_pa_power_count(void);
+void rf_pa_write_eeprom(uint8_t idx);
 void rf_pa_init(void);
 void rf_pa_enable(bool on);
 uint16_t rf_pa_read_vdet_mv(void);
 uint16_t rf_pa_get_vref_mv(void);
 void rf_pa_set_vref_mv(uint16_t mv);
 void rf_pa_set_calibration(uint16_t mv);
-uint16_t rf_pa_set_power_level(rf_pa_power_t level);
+uint16_t rf_pa_set_power_level(uint8_t level);
 void rf_pa_loop(void);
 
 #endif //RF_PA_H

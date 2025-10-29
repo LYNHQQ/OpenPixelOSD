@@ -5,8 +5,10 @@
 #include "rf_pa.h"
 #include "main.h"
 #include <stdbool.h>
+#include <string.h>
 #include "rtc6705.h"
-#include  "vtx_msp.h"
+#include "vtx_msp.h"
+#include "flash.h"
 
 
 powerTable_t powerTable[] = { {0,  {' ', ' ', '0'}, RTC6705_PA_3dBm,  { 5650, 5700, 5750, 5800, 5850, 5900, 5950 },     //cal frequency
@@ -21,8 +23,8 @@ powerTable_t powerTable[] = { {0,  {' ', ' ', '0'}, RTC6705_PA_3dBm,  { 5650, 57
                                                                       { 3274, 3206, 2804, 2514, 2432, 2469, 2595 }},
                             };
 
+#define NUM_PWR             (sizeof(powerTable)/sizeof(powerTable[0]) - 1)
 
-#define NUM_PWR (sizeof(powerTable)/sizeof(powerTable[0]) - 1)
 
 static uint16_t g_vref_mv = 0;
 float rf_detector_target = 0;
@@ -38,7 +40,7 @@ static inline void dac_ch2_write_mv(uint16_t mv)
     uint32_t dac_raw = DAC12BIT_FROM_MV(mv);
     #ifdef PA_LIMIT
       if (dac_raw > PA_LIMIT) {
-        dac_raw > PA_LIMIT;
+        dac_raw = PA_LIMIT;
       } 
     #endif
     if (dac_raw > 4095u) dac_raw = 4095u;
@@ -46,14 +48,6 @@ static inline void dac_ch2_write_mv(uint16_t mv)
     LL_DAC_TrigSWConversion(DAC1, LL_DAC_CHANNEL_2);
 
     g_vref_mv = mv;
-}
-
-void rf_pa_init(void)
-{
-    g_vref_mv = 0;
-    /* Enable DAC1 ch2 if not already enabled by user init */
-    LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_2);
-    rf_pa_enable(false); // keep PA off at boot
 }
 
 void rf_pa_enable(bool on)
@@ -132,11 +126,11 @@ uint16_t get_calibration_mV(uint8_t level)
   return retVal;
 }
 
-uint16_t rf_pa_set_power_level(rf_pa_power_t level)
+uint16_t rf_pa_set_power_level(uint8_t level)
 {
     uint16_t mv;
 
-    if (!level || level >= RF_PA_PWR_COUNT) {
+    if (!level || level > NUM_PWR) {
       mv = 0;
       rf_detector_target = 0;
       rf_detector = 0;
@@ -154,6 +148,74 @@ void rf_pa_set_calibration(uint16_t mv)
 {
     rf_detector_target = 0;  
     rf_pa_set_vref_mv(mv);
+}
+
+void rf_pa_read_eeprom(uint8_t idx) {
+  flashBlock_t block;
+  uint8_t* valBytes;
+
+  valBytes = (uint8_t*)powerTable[idx].calibration;
+  block.idx = idx<<2;
+  if (eeprom_read(&block)) {
+    TRACE_INFO("eeprom block %i read \n", block.idx);
+    memcpy(&valBytes[0] ,&block.value, sizeof(block.value));
+  }
+  block.idx++;
+  if (eeprom_read(&block)) {
+    TRACE_INFO("eeprom block %i read \n", block.idx);
+    memcpy(&valBytes[7] ,&block.value, sizeof(block.value));
+  }
+  valBytes = (uint8_t*)powerTable[idx].detector;
+  block.idx++;
+  if (eeprom_read(&block)) {
+    TRACE_INFO("eeprom block %i read \n", block.idx);
+    memcpy(&valBytes[0] ,&block.value, sizeof(block.value));
+  }
+  block.idx++;
+  if (eeprom_read(&block)) {
+    TRACE_INFO("eeprom block %i read \n", block.idx);
+    memcpy(&valBytes[7] ,&block.value, sizeof(block.value));
+  }
+}
+
+void rf_pa_write_eeprom(uint8_t idx) {
+  flashBlock_t block;
+  uint8_t* valBytes;
+
+  valBytes = (uint8_t*)powerTable[idx].calibration;
+  block.idx = idx<<2;
+  memcpy(&block.value, &valBytes[0], sizeof(block.value));
+  eeprom_write(&block);
+
+  block.idx++;
+  memcpy(&block.value, &valBytes[7], sizeof(block.value));
+  eeprom_write(&block);
+
+  valBytes = (uint8_t*)powerTable[idx].detector;
+  block.idx++;
+  memcpy(&block.value, &valBytes[0], sizeof(block.value));
+  eeprom_write(&block);
+
+  block.idx++;
+  memcpy(&block.value, &valBytes[7], sizeof(block.value));
+  eeprom_write(&block);
+
+  eeprom_dump();
+}
+
+void rf_pa_init(void)
+{
+    g_vref_mv = 0;
+    /* Enable DAC1 ch2 if not already enabled by user init */
+    LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_2);
+    rf_pa_enable(false); // keep PA off at boot
+
+    for (uint8_t idx = 1; idx <= NUM_PWR; idx++) {
+      rf_pa_read_eeprom(idx);
+    }
+
+    eeprom_dump();
+
 }
 
 void rf_pa_loop(void)

@@ -126,7 +126,8 @@ if(BUILD_VARIANT STREQUAL "VTX")
     set(VTX_SRC
             ./src/rtc6705.c
             ./src/rf_pa.c
-            ./src/vtx_msp.c)
+            ./src/vtx_msp.c
+            ./src/msp/mspMenu.c)
 endif()
 
 add_compile_definitions(
@@ -152,7 +153,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/stm32g4xx/syscalls.c
         ./src/stm32g4xx/system.c
         ./src/msp/msp.c
-        ./src/msp/mspMenu.c
         ./src/gpio.c
         ./src/dac.c
         ./src/adc.c
@@ -162,6 +162,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/comp.c
         ./src/uart.c
         ./src/usb.c
+        ./src/flash.c
         ./src/video_gen.c
         ./src/video_overlay.c
         ./src/canvas_char.c

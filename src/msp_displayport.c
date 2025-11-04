@@ -242,9 +242,9 @@ EXEC_RAM void msp_loop_process(void)
 
 #if defined(BUILD_VARIANT_VTX)
     static uint32_t last_tick = 0;
-    static bool resp = true;
+    //static bool resp = true;
     static uint8_t c = 0;
-    if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL + (1 - fcArmed) * 5) && resp) {
+    if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL + (fcArmed * 900))) {
         last_tick = HAL_GetTick();
         switch(c) {
           case 0:

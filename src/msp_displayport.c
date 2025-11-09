@@ -31,6 +31,7 @@ typedef enum {
 
 extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
+extern uint8_t paint_buffer;
 extern bool show_logo;
 
 extern uint8_t fcArmed;
@@ -115,7 +116,7 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
                 uint8_t col = payload[2];
                 if (row >= ROW_SIZE || col >= COLUMN_SIZE) break;
                 uint8_t len = data_size - 4;
-                memcpy(&canvas_char_map[active_buffer][row][col], (const char *)&payload[4], len);
+                memcpy(&canvas_char_map[paint_buffer][row][col], (const char *)&payload[4], len);
             }
                 break;
             case MSP_DISPLAYPORT_DRAW_SCREEN: // 4 -> Draw Screen
@@ -212,6 +213,21 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
 #if defined(BUILD_VARIANT_VTX)
             vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
 #endif
+            break;
+          case MSP_VTX_CONFIG:
+          case MSP_SET_VTX_CONFIG:
+          case MSP_VTXTABLE_BAND:
+          case MSP_VTXTABLE_POWERLEVEL: {
+#if defined(BUILD_VARIANT_VTX)
+              vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
+              const vtx_config_t *vtx_config = vtx_get_config();
+              if (!vtx_config->vtx_table_available) {
+                  TRACE_INFO("Set Table defaults\n");
+                  vtx_msp_clear_table_and_set_defaults(owner);
+                  
+              }
+#endif
+          }
             break;
           default:
             printf("MSP V2 command not parsed %d:0x%02X\r\n",msp_cmd, msp_cmd);

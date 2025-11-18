@@ -58,7 +58,7 @@ void rf_pa_enable(bool on)
 void rf_pa_set_vref_mv(uint16_t mv)
 {
     dac_ch2_write_mv(mv);
-    TRACE_INFO("SET PA mv %i\n",mv);
+    TRACE_DEBUG("SET PA mv %i\n",mv);
 }
 
 uint16_t rf_pa_get_vref_mv(void)
@@ -234,11 +234,11 @@ void rf_pa_loop(void)
         if (rf_detector < rf_detector_target * 0.985) {
           rf_pa_set_vref_mv(g_vref_mv + 1);
           last_detector_change = HAL_GetTick();
-          TRACE_INFO("detector change %i \n", g_vref_mv);
+          //TRACE_INFO("detector change %i \n", g_vref_mv);
         } else if (rf_detector > rf_detector_target * 1.02) {
           rf_pa_set_vref_mv(g_vref_mv - 1);
           last_detector_change = HAL_GetTick();
-          TRACE_INFO("detector change %i \n", g_vref_mv);
+          //TRACE_INFO("detector change %i \n", g_vref_mv);
         }
       }
     }

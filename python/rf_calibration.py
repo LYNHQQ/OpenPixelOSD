@@ -3,6 +3,7 @@ import asyncio
 from cImmersionRC import PowerMeter
 from cMsp import MSP
 
+
 if sys.platform.startswith("win"):
   import msvcrt
   async def getch():
@@ -14,6 +15,7 @@ else:
   import tty
   import termios
   import select
+
 
   async def getch():
     fd = sys.stdin.fileno()
@@ -135,6 +137,7 @@ async def scanPa(power):
     
     msp.send_MSP_SET_PACALIBRATION(1)
 
+
 async def scanDetector(power):
   global meter
   msp.power = power
@@ -227,7 +230,6 @@ def printPaTable():
         sys.stdout.write(f' }}\n')
 
 
-
 async def menue():
   try:
     while True:
@@ -283,7 +285,6 @@ async def menue():
         print("\nSave EEPROM")
 
       elif key == "q":
-        print("→ Exit")
         break
 
       else:
@@ -331,10 +332,10 @@ async def main(serialPortVtx, serialPortMeter):
   await msp.close()
   await asyncio.sleep(1)
 
+
 if __name__ == "__main__":
   if len(sys.argv) != 3:
       print(f"\nUsage: python {sys.argv[0]} <COMM_PORT_VTX> <COM_PORT_POWER_METER>")
       sys.exit(1)
   asyncio.run(main(sys.argv[1], sys.argv[2]))
-  #asyncio.run(main('COM8', 'COM29'))
 

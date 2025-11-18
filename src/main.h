@@ -114,6 +114,11 @@ typedef enum {
 #define BOOT_KEY_Pin                            LL_GPIO_PIN_8
 #define BOOT_KEY_GPIO_Port                      GPIOB
 
+//Test point
+#define TP1_Pin                                 LL_GPIO_PIN_1
+#define TP1_GPIO_Port                           GPIOB
+
+
 #define EXEC_RAM      __attribute__((section (".ccmram.text"), optimize("Ofast"))) /* exec functions from CCMRAM */
 #define CCMRAM_DATA   __attribute__((section (".ccmram.data"))) /* initialized var */
 #define CCMRAM_BSS    __attribute__((section (".ccmram.bss"))) /* uninitialized var */
@@ -124,14 +129,15 @@ typedef enum {
 #define DAC8BIT_TO_MV(value)                    (((uint32_t)(value) * 3300) / 255)
 #define DAC8BIT_FROM_MV(mV)                     (((uint32_t)(mV) * 255) / 3300)
 
-#define SYNC_START_MV                           350
-#define SYNC_SCAN_MIN_MV                        100
+#define SYNC_START_MV                           300
+#define SYNC_SCAN_MIN_MV                        10
 #define SYNC_SCAN_MAX_MV                        800
-#define SYNC_SCAN_INC_MV                        20
-#define SYNC_TO_BLACK_MIN_MV                    150
+#define SYNC_SCAN_INC_MV                        25
+#define SYNC_SCAN_INC_NARROW_MV                 10
+#define SYNC_SCAN_NARROW_MV                     250
+//#define SYNC_TO_BLACK_MIN_MV                    50
 
-#define SYNC_QUALITY_THRESHOLD                  5
-#define SYNC_NOISE_THRESHOLD                    10
+#define SYNC_QUALITY_THRESHOLD                  300
 #define SYNC_LOST_FRAMES_THRESHOLD              50
 
 #define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)

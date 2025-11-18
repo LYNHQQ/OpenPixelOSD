@@ -20,7 +20,7 @@
 
 // OPAMP1 multiplexer constants
 #define OPAMP_CONST_IO0     0x108000E1U  // Positive Input IO0 (e.g., PA1) -
-#define OPAMP_CONST_IO1     ((VIDEO_TOTAL_GAIN / VIDEO2_INPUT_GAIN) == 1 ? 0x108000E5U : 0x108000E5U)   // Positive Input IO1 (e.g., PA3) - video generator input
+#define OPAMP_CONST_IO1     ((VIDEO_TOTAL_GAIN / VIDEO2_INPUT_GAIN) == 1 ? 0x108000E5U : 0x108000C5U)   // Positive Input IO1 (e.g., PA3) - video generator input
 #define OPAMP_CONST_IO2     ((VIDEO_TOTAL_GAIN / VIDEO1_INPUT_GAIN) == 1 ? 0x108000E9U : 0x108000C9U)  // Positive Input IO2 (e.g., PA7) - video input form camera
 
 #define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC)
@@ -53,9 +53,11 @@ uint16_t* video_levels = &video_level[1];
 uint32_t* opa_vals = &opa_val[0];
 
 uint16_t sync_quality = 0;
-uint16_t sync_noise = 0;
-uint8_t frame_counter = 0; 
+uint8_t frame_counter = 0;
 uint16_t sync_voltage = SYNC_START_MV;
+syncMode_t syncMode = OFF;
+float sync_voltage_avg = SYNC_START_MV;
+uint16_t sync_voltage_black = SYNC_START_MV;
 
 static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORLD/WORLD
 static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORLD/WORLD
@@ -157,8 +159,8 @@ void video_overlay_init(void)
     LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_1);
     LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_2);
 
-    LL_TIM_EnableIT_UPDATE(TIM4);
-    LL_TIM_EnableCounter(TIM4);
+    //LL_TIM_EnableIT_UPDATE(TIM4);
+    //LL_TIM_EnableCounter(TIM4);
 
     LL_TIM_EnableIT_UPDATE(TIM17);
 
@@ -170,15 +172,34 @@ void video_overlay_init(void)
 
 }
 
-void scan_sync_voltage (int16_t step) {
+void scan_sync_voltage(void) {
+    static uint8_t last_frame = 0;
+    static uint32_t wide_scan = 2;
 
-    sync_voltage += step;
+    if(frame_counter != last_frame) {
+      wide_scan = 0;
+    }
+    last_frame = frame_counter;
 
+    if(wide_scan > 1) {
+      sync_voltage += SYNC_SCAN_INC_MV;
+    } else {
+      sync_voltage += SYNC_SCAN_INC_NARROW_MV;
+    }
+    
+
+    if((wide_scan == 0) && (sync_voltage > sync_voltage_black)) {
+      wide_scan++;
+      int16_t sv = sync_voltage_black - SYNC_SCAN_NARROW_MV;
+      if(sv < SYNC_SCAN_MIN_MV) {
+        sync_voltage = SYNC_SCAN_MIN_MV;
+      }
+      sync_voltage = sv;
+    }
+    
     if(sync_voltage > SYNC_SCAN_MAX_MV) {
       sync_voltage = SYNC_SCAN_MIN_MV;
-    } else if(sync_voltage < SYNC_SCAN_MIN_MV) {
-      sync_voltage = SYNC_SCAN_MIN_MV;
-    }
+    } 
 
     LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * VIDEO_INPUT_GAIN);
 }
@@ -400,7 +421,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
 EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
 {
     CCMRAM_BSS static uint16_t video_line = 0;
-    CCMRAM_BSS static uint16_t quality = 0;
+    CCMRAM_BSS static uint8_t vsync = 0;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
     if(time_ns > 59.f && time_ns < 65.f) {
@@ -416,26 +437,32 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         if (new_field == false) {
             new_field = true;
         }
-        if(time_ns < 63.5f) {
-          quality++;
-        }
+        vsync = 0;
     } else if (time_ns > 29.0f && time_ns < 33.0f) {
-        if ( video_line > 10) {
-          if(video_line > 300) {
-            sync_quality = quality;
-            sync_noise = 0;
-            frame_counter++;
-          } else {
-            sync_quality = quality + (305 - video_line);
-          }
-          quality = 0;
+        //LL_GPIO_TogglePin(TP1_GPIO_Port, TP1_Pin);
+        vsync++;
+        if (vsync == 11) {
+          sync_voltage_black = DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN);
         }
-        video_line = 0;
-        if (new_field == true) {
+    } else if (time_ns > 56.0f && time_ns < 58.0f) {
+        if (vsync >= 4) {
+          vsync = 4;
+          LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
+        }
+    } else if (time_ns > 6.5f && time_ns < 7.5f) {
+        if (vsync >= 7) {
+          LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
+          
+          if (new_field == true) {
             new_field = false;
+          }
+          sync_quality = video_line;
+
+          frame_counter++;
+          video_line = 0;
         }
     } else {
-        sync_noise++;
+        vsync = 0;
         // Do nothing, wait for next sync
     }
     #ifdef TRIGGER_LINE
@@ -445,7 +472,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
 
 EXEC_RAM static inline bool check_resync(uint32_t tim_tick)
 {
-    CCMRAM_BSS static uint8_t resync = 100;
+    CCMRAM_DATA static uint8_t resync = 100;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
     if(time_ns > 63.5f && time_ns < 64.5f) {
@@ -471,17 +498,18 @@ EXEC_RAM void TIM2_IRQHandler(void)
             return;
           }
         }
-        TIM4->CNT = 0;
-        video_source = VIDOE_OPAMP_IMPUT;
-        opa_val[1] = video_source;
-        opa_val[5] = VIDOE_OPAMP_IMPUT;
-        OPAMP1->CSR = video_source;
-        LL_TIM_DisableCounter(TIM8);
-        if (video_gen_enabled == true) {
-            video_gen_stop();
-        } else {
-            pars_video_signal(TIM2->CCR2);
-            set_black_level(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
+        if (syncMode == EXTERNAL || syncMode == AUTOMATIC) {
+          video_source = VIDOE_OPAMP_IMPUT;
+          opa_val[1] = video_source;
+          opa_val[5] = VIDOE_OPAMP_IMPUT;
+          OPAMP1->CSR = video_source;
+          //LL_TIM_DisableCounter(TIM8);
+          if (video_gen_enabled == true) {
+              video_gen_stop();
+          } else {
+              pars_video_signal(TIM2->CCR2);
+              set_black_level(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
+          }
         }
         LL_TIM_ClearFlag_CC2(TIM2);
     }
@@ -495,7 +523,6 @@ EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
       if(DMA1_Channel5->CNDTR == 1) {
         ARR_prev += TIM17->ARR;
       } else {
-        TIM4->CNT = 0;
         video_source = OPAMP_CONST_DAC;
         opa_val[1] = video_source;
         opa_val[5] = OPAMP_CONST_DAC;
@@ -518,33 +545,73 @@ void video_sync_loop(void) {
   static uint8_t sync_lost = 50;
   static uint8_t last_frame;
 
-  if ((HAL_GetTick() - last_tick) >= 20) {
-    last_tick = HAL_GetTick();
-    if(sync_quality > SYNC_QUALITY_THRESHOLD || video_gen_enabled == true) {
-      scan_sync_voltage(SYNC_SCAN_INC_MV);
-    } else if (sync_noise > SYNC_NOISE_THRESHOLD) {
-      sync_noise = 0;
-      scan_sync_voltage(SYNC_SCAN_INC_MV);
-    }
-    else if(DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN) - sync_voltage < SYNC_TO_BLACK_MIN_MV ) {
-      scan_sync_voltage(-1);
+  if (syncMode == OFF) {
+    return;
+  }
+
+  if (((HAL_GetTick() - last_tick) >= 25) || (frame_counter != last_frame)) {
+    
+    if(sync_quality < SYNC_QUALITY_THRESHOLD || video_gen_enabled == true) {
+      scan_sync_voltage();
+    } else if (frame_counter == last_frame) {
+      scan_sync_voltage();
+    //else if(DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN) - sync_voltage < SYNC_TO_BLACK_MIN_MV ) {
+    //  scan_sync_voltage(-1);
+    //}
+    } else {
+      sync_voltage_avg = sync_voltage_avg * 0.8 + sync_voltage * 0.2;
     }
 
     if (video_gen_enabled == false) {
       if(last_frame == frame_counter) {
-        if(!--sync_lost) {
-          video_source = OPAMP_CONST_DAC;
-          OPAMP1->CSR = video_source;
-          set_black_level(DAC_BLACK);
-          video_gen_start();
-          sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
+        if (syncMode == AUTOMATIC) {
+          if(!--sync_lost) {
+            video_source = OPAMP_CONST_DAC;
+            OPAMP1->CSR = video_source;
+            set_black_level(DAC_BLACK);
+            video_gen_start();
+            sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
+          }
         }
       } else {
         sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
       }
-      last_frame = frame_counter;
+      
     }
+    last_frame = frame_counter;
+    last_tick = HAL_GetTick();
   }
+}
 
+void setSyncMode(syncMode_t mode) {
+
+  switch(mode) {
+    case AUTOMATIC:
+
+      syncMode = AUTOMATIC;
+      break;
+    case EXTERNAL:
+
+      syncMode = EXTERNAL;
+      break;
+    case INTERNAL:
+      video_source = OPAMP_CONST_DAC;
+      OPAMP1->CSR = video_source;
+      set_black_level(DAC_BLACK);
+      video_gen_start();
+      syncMode = INTERNAL;
+      break;
+    case OFF:
+      video_source = VIDOE_OPAMP_IMPUT;
+      opa_val[1] = video_source;
+      opa_val[5] = VIDOE_OPAMP_IMPUT;
+      OPAMP1->CSR = video_source;
+      //LL_TIM_DisableCounter(TIM8);
+      if (video_gen_enabled == true) {
+          video_gen_stop();
+      }
+      syncMode = OFF;
+      break;
+  }
 
 }

@@ -26,13 +26,12 @@ extern bool new_field;
 #endif
 
 #define LED_BLINK_INTERVAL 100 // milliseconds
-#define DEBUG_LOOP_INTERVAL 2500 // milliseconds
+#define DEBUG_LOOP_INTERVAL 100 // milliseconds
 
 void led_blink(void);
 
 extern volatile uint16_t sync_quality;
 extern volatile uint16_t sync_voltage;
-extern volatile uint16_t sync_noise;
 extern uint16_t video_level[];
 
 extern double rf_detector;
@@ -43,13 +42,12 @@ void debug_print_loop(void)
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
-        /*uint16_t rf_detect_int = rf_detector;
-        TRACE_INFO("sync voltage:%i black: %i quality:%i noise:%i adc_1:%i\n",
+        uint16_t rf_detect_int = rf_detector;
+        TRACE_INFO("sync voltage:%i black: %i quality:%i adc_1:%i\n",
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
           sync_quality, 
-          sync_noise,
-          rf_detect_int); // Loop debug printf here*/
+          rf_detect_int); // Loop debug printf here
     }
 }
 
@@ -70,6 +68,8 @@ int main (void)
     flash_init();
 
     video_overlay_init();
+    setSyncMode(AUTOMATIC);
+
 #if defined(HIGH_RAM)
     video_graphics_init();
     video_draw_text_system_font(FONT_SYSTEM_WIDTH * 2, VIDEO_HEIGHT - FONT_SYSTEM_HEIGHT, "WAITING MSP...");

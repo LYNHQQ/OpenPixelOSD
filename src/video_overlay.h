@@ -6,11 +6,17 @@
 #define VIDEO_OVERLAY_H
 
 typedef enum {
-  AUTOMATIC,
+  OFF,
   INTERNAL,
   EXTERNAL,
-  OFF
+  AUTOMATIC
 } syncMode_t;
+
+typedef enum {
+    SYNC_STATE_SEARCH,
+    SYNC_STATE_FOUND,
+    SYNC_STATE_EXTERNAL,
+} syncState_t;
 
 void video_overlay_init(void);
 void video_sync_loop(void);

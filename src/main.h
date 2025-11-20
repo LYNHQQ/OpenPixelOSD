@@ -66,6 +66,7 @@
 
 #define PEXELS_PER_LINE                         (COLUMN_SIZE * 12)
 #define BLACK_LEVEL_ADC_DELAY_US                3300
+#define LOW_SYNC_ADC_DELAY_US                   6000
 
 typedef enum {
   PX_BLACK = 0,
@@ -130,15 +131,11 @@ typedef enum {
 #define DAC8BIT_FROM_MV(mV)                     (((uint32_t)(mV) * 255) / 3300)
 
 #define SYNC_START_MV                           300
-#define SYNC_SCAN_MIN_MV                        10
+#define SYNC_SCAN_MIN_MV                        25
 #define SYNC_SCAN_MAX_MV                        800
 #define SYNC_SCAN_INC_MV                        25
-#define SYNC_SCAN_INC_NARROW_MV                 10
-#define SYNC_SCAN_NARROW_MV                     250
-//#define SYNC_TO_BLACK_MIN_MV                    50
 
-#define SYNC_QUALITY_THRESHOLD                  300
-#define SYNC_LOST_FRAMES_THRESHOLD              50
+#define SYNC_LOST_FRAMES_THRESHOLD              20
 
 #define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
 

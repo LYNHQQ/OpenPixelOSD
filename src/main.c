@@ -30,10 +30,11 @@ extern bool new_field;
 
 void led_blink(void);
 
-extern volatile uint16_t sync_quality;
 extern volatile uint16_t sync_voltage;
+extern uint16_t sync_voltage_black;
+extern uint16_t sync_voltage_low;
 extern uint16_t video_level[];
-
+extern syncState_t syncState;
 extern double rf_detector;
 
 void debug_print_loop(void)
@@ -43,10 +44,12 @@ void debug_print_loop(void)
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
         uint16_t rf_detect_int = rf_detector;
-        TRACE_INFO("sync voltage:%i black: %i quality:%i adc_1:%i\n",
+        TRACE_INFO("state:%i sync V:%i bl: %i sync bl:%i sync low:%i adc_1:%i\n",
+          syncState,
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
-          sync_quality, 
+          sync_voltage_black,
+          sync_voltage_low,
           rf_detect_int); // Loop debug printf here
     }
 }

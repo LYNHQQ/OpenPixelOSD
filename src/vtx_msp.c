@@ -249,7 +249,12 @@ static void handle_msp_set_vtx_config(uint8_t owner, const uint8_t *payload, uin
       g_cfg.frequency = freq_mhz;
     }
     
-    g_cfg.vtx_table_available = vtx_table_available;
+    if(vtx_table_bands != NUM_BANDS || vtx_table_power_levels != rf_pa_power_count()) {
+      g_cfg.vtx_table_available = 0;
+    } else {
+      g_cfg.vtx_table_available = vtx_table_available;
+    }
+
     g_cfg.configSet = 1;
     
     /* Apply to hardware */

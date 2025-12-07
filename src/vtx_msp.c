@@ -156,22 +156,22 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
 {
     printf("vtx_apply_hw: band=%d ch=%d freq=%d power=%d pit=%d\n",
            cfg->band, cfg->channel, cfg->frequency, cfg->power, cfg->pitmode);
+    
+    /* disable external RF Power Amplifier */
+    rf_pa_set_power_level(RF_PA_PWR_OFF);
+
+    /* Set internal RTC6705 PA to minimum */
+    rtc6705_allow_power_writes(true);
+    rtc6705_set_power(RTC6705_PA_3dBm);
+    rtc6705_allow_power_writes(false);
 
     /* Program synthesizer frequency (MHz) */
     if (freq_is_in_58ghz(cfg->frequency)) {
         rtc6705_set_frequency(cfg->frequency);
     }
 
-    /* External PA enable/pitmode */
-    if (cfg->pitmode) {
-        /* Set internal RTC6705 PA power */
-        rtc6705_allow_power_writes(true);
-        rtc6705_set_power(RTC6705_PA_3dBm);
-        rtc6705_allow_power_writes(false);
-
-        /* Pit: minimal radiation — disable external RF Power Amplifier */
-        rf_pa_set_power_level(RF_PA_PWR_OFF);
-    } else {
+    /* Set power */
+    if (!cfg->pitmode) {
         /* Set internal RTC6705 PA power */
         rtc6705_allow_power_writes(true);
         rtc6705_set_power(powerTable[cfg->power].rtcPA);

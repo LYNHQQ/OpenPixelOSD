@@ -13,6 +13,7 @@
 #include "usb.h"
 #include "rf_pa.h"
 #include "vtx_msp.h"
+#include "video_overlay.h"
 
 #if defined(BUILD_VARIANT_VTX)
 #include "vtx_msp.h"
@@ -75,57 +76,59 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
     case MSP_V1: {
         switch(msp_cmd) {
         case MSP_DISPLAYPORT: {
-            msp_displayport_cmd_t sub_cmd = payload[0];
-            switch(sub_cmd) {
-            case MSP_DISPLAYPORT_KEEPALIVE: // 0 -> Open/Keep-Alive DisplayPort
-            {
-                static bool displayport_initialized = false;
-                if (!displayport_initialized) {
-                    #if defined(BUILD_VARIANT_VTX)
-                    vtx_msp_request_config(owner);
-                    #endif
-                    displayport_initialized = true;
-                    show_logo = false;
-                    // Send canvas size to FC
-                    uint8_t data[2] = {COLUMN_SIZE, ROW_SIZE};
-                    uint8_t tx_buff[64];
-                    uint16_t len = construct_msp_command_v1(tx_buff, MSP_SET_OSD_CANVAS, data, 2, MSP_OUTBOUND);
-                    switch(owner) {
-                    case MSP_OWNER_UART:
-                        uart1_tx_dma(tx_buff, len);
-                        break;
-                    case MSP_OWNER_USB:
-                        usb_uart_write_bytes((const char *)tx_buff, len);
-                        break;
-                    default:
-                        break;
+            if (osdState == OSD_MSP) {
+                msp_displayport_cmd_t sub_cmd = payload[0];
+                switch(sub_cmd) {
+                case MSP_DISPLAYPORT_KEEPALIVE: // 0 -> Open/Keep-Alive DisplayPort
+                {
+                    static bool displayport_initialized = false;
+                    if (!displayport_initialized) {
+                        #if defined(BUILD_VARIANT_VTX)
+                        vtx_msp_request_config(owner);
+                        #endif
+                        displayport_initialized = true;
+                        show_logo = false;
+                        // Send canvas size to FC
+                        uint8_t data[2] = {COLUMN_SIZE, ROW_SIZE};
+                        uint8_t tx_buff[64];
+                        uint16_t len = construct_msp_command_v1(tx_buff, MSP_SET_OSD_CANVAS, data, 2, MSP_OUTBOUND);
+                        switch(owner) {
+                        case MSP_OWNER_UART:
+                            uart1_tx_dma(tx_buff, len);
+                            break;
+                        case MSP_OWNER_USB:
+                            usb_uart_write_bytes((const char *)tx_buff, len);
+                            break;
+                        default:
+                            break;
+                        }
                     }
                 }
-            }
-                break;
-            case MSP_DISPLAYPORT_RELEASE: // 1 -> Close DisplayPort
-                show_logo = true;
-                break;
-            case MSP_DISPLAYPORT_CLEAR: // 2 -> Clear Screen
-                canvas_char_clean();
-                break;
-            case MSP_DISPLAYPORT_DRAW_STRING:  // 3 -> Draw String
-            {
-                if (data_size < 5) break;
-                uint8_t row = payload[1];
-                uint8_t col = payload[2];
-                if (row >= ROW_SIZE || col >= COLUMN_SIZE) break;
-                uint8_t len = data_size - 4;
-                memcpy(&canvas_char_map[paint_buffer][row][col], (const char *)&payload[4], len);
-            }
-                break;
-            case MSP_DISPLAYPORT_DRAW_SCREEN: // 4 -> Draw Screen
-                canvas_char_draw_complete();
-                break;
-            case MSP_DISPLAYPORT_SET_OPTIONS: // 5 -> Set Options (HDZero/iNav)
-                break;
-            default:
-                break;
+                    break;
+                case MSP_DISPLAYPORT_RELEASE: // 1 -> Close DisplayPort
+                    show_logo = true;
+                    break;
+                case MSP_DISPLAYPORT_CLEAR: // 2 -> Clear Screen
+                    canvas_char_clean();
+                    break;
+                case MSP_DISPLAYPORT_DRAW_STRING:  // 3 -> Draw String
+                {
+                    if (data_size < 5) break;
+                    uint8_t row = payload[1];
+                    uint8_t col = payload[2];
+                    if (row >= ROW_SIZE || col >= COLUMN_SIZE) break;
+                    uint8_t len = data_size - 4;
+                    memcpy(&canvas_char_map[paint_buffer][row][col], (const char *)&payload[4], len);
+                }
+                    break;
+                case MSP_DISPLAYPORT_DRAW_SCREEN: // 4 -> Draw Screen
+                    canvas_char_draw_complete();
+                    break;
+                case MSP_DISPLAYPORT_SET_OPTIONS: // 5 -> Set Options (HDZero/iNav)
+                    break;
+                default:
+                    break;
+                }
             }
         }
             break;
@@ -258,7 +261,7 @@ EXEC_RAM void msp_loop_process(void)
 
 #if defined(BUILD_VARIANT_VTX)
     static uint32_t last_tick = 0;
-    //static bool resp = true;
+    static uint8_t configRequest = 2;
     static uint8_t c = 0;
     if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL + (fcArmed * 900))) {
         last_tick = HAL_GetTick();
@@ -273,7 +276,16 @@ EXEC_RAM void msp_loop_process(void)
             c = c + (1 - fcArmed);
             break;
           case 3:
-            if (!vtx_get_config()->configSet) vtx_msp_request_config(MSP_OWNER_UART);
+            if (!vtx_get_config()->configSet) {
+              if(configRequest) {
+                vtx_msp_request_config(MSP_OWNER_UART);
+                configRequest--;
+              } else {
+                vtx_set_pitmode(0);
+                vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
+                vtx_config->configSet = 1;
+              }
+            } 
             c = 0;
             break;
         }

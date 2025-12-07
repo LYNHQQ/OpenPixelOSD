@@ -18,6 +18,17 @@ typedef enum {
     SYNC_STATE_EXTERNAL,
 } syncState_t;
 
+typedef enum {
+  OSD_INIT,
+  OSD_OFF,  
+  OSD_MSP,
+  OSD_MENU,
+  OSD_EXIT_MENU
+} osdState_e;
+
+extern osdState_e osdState;
+extern bool displayport_enabled;
+
 void video_overlay_init(void);
 void video_sync_loop(void);
 void setSyncMode(syncMode_t mode);

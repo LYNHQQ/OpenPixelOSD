@@ -140,7 +140,7 @@ void vtx_set_band_channel(int8_t band, uint8_t channel)
     if(freq_is_in_58ghz(g_bands[band].freq[channel])) {
         g_cfg.band = band;
         g_cfg.channel = channel;
-        g_cfg.frequency = g_bands[band].freq[channel];
+        g_cfg.frequency = g_bands[band-1].freq[channel-1];
         vtx_apply_hw(&g_cfg);
     }
     

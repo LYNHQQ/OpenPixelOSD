@@ -13,7 +13,8 @@
 #include "rtc6705.h"
 #include "rf_pa.h"
 #include "vtx_msp.h"
-#include "mspMenu.h"
+#include "settingsMenu.h"
+#include "settings.h"
 #endif
 #include <stdio.h>
 #ifdef TRACE_LEVEL
@@ -26,7 +27,7 @@ extern bool new_field;
 #endif
 
 #define LED_BLINK_INTERVAL 100 // milliseconds
-#define DEBUG_LOOP_INTERVAL 100 // milliseconds
+#define DEBUG_LOOP_INTERVAL 5000 // milliseconds
 
 void led_blink(void);
 
@@ -36,6 +37,7 @@ extern uint16_t sync_voltage_low;
 extern uint16_t video_level[];
 extern syncState_t syncState;
 extern double rf_detector;
+extern uint8_t stickPos;
 
 void debug_print_loop(void)
 {
@@ -44,8 +46,8 @@ void debug_print_loop(void)
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
         uint16_t rf_detect_int = rf_detector;
-        TRACE_INFO("state:%i sync V:%i bl: %i sync bl:%i sync low:%i adc_1:%i\n",
-          syncState,
+        TRACE_INFO("stickPos:%x sync V:%i bl: %i sync bl:%i sync low:%i adc_1:%i\n",
+          stickPos,
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
           sync_voltage_black,
@@ -69,9 +71,10 @@ int main (void)
     dma_init();
     adc_init();
     flash_init();
-
+#if defined(BUILD_VARIANT_VTX)
+    settings_load();
+#endif
     video_overlay_init();
-    setSyncMode(AUTOMATIC);
 
 #if defined(HIGH_RAM)
     video_graphics_init();
@@ -82,9 +85,10 @@ int main (void)
 
 #if defined(BUILD_VARIANT_VTX)
     rf_pa_init();
-    if(rtc6705_init()) {
+    if(rtc6705_init() || 1) {
         printf("rtc6705 detected\r\n");
-        vtx_set_power(RF_PA_PWR_DEFAULT);
+        vtx_set_pitmode(1);
+        vtx_set_power(vtx_get_config()->power);
     }
 #endif
 

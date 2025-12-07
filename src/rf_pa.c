@@ -58,7 +58,7 @@ void rf_pa_enable(bool on)
 void rf_pa_set_vref_mv(uint16_t mv)
 {
     dac_ch2_write_mv(mv);
-    TRACE_DEBUG("SET PA mv %i\n",mv);
+    //TRACE_DEBUG("SET PA mv %i\n",mv);
 }
 
 uint16_t rf_pa_get_vref_mv(void)

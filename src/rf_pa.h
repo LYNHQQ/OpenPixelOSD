@@ -9,7 +9,6 @@
 
 #define POWER_LABEL_LENGTH      3
 #define RF_PA_PWR_OFF           0
-#define RF_PA_PWR_DEFAULT       1
 
 typedef struct {
     uint16_t mW;

@@ -1,16 +1,16 @@
 #include <string.h>
 #include "main.h"
 
-#include "mspMenu.h"
+#include "settingsMenu.h"
+#include "settings.h"
 #include "vtx_msp.h"
 #include "canvas_char.h"
 #include "rf_pa.h"
+#include "video_overlay.h"
 
 #define OSD_MENU_TOP                2
 #define OSD_MENU_TEXT_LEFT          2
 #define OSD_MENU_VALUE_LEFT         16
-
-osdState_e osdState = OSD_MSP;
 
 uint8_t tempChannel;
 uint8_t tempBand;
@@ -35,7 +35,7 @@ osdEntry_t osdMenue[] = { {"BAND",        (osdPrintFuncPtr)printMenuValue,    (o
                           {"FREQUENCY",   (osdPrintFuncPtr)printMenuValue,    NULL},
                           {"POWER",       (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePower},
                           {"PIT MODE",    (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePit},
-                          //{"DISPLAYPORT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeDisplayport},
+                          {"DISPLAYPORT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeDisplayport},
                           {"EXIT",        NULL,                               (osdKeyFuncPtr)exitVtxMenu},
                           {"SAVE+EXIT",   NULL,                               (osdKeyFuncPtr)exitVtxMenu}};
 
@@ -46,13 +46,21 @@ void printMenuValue(uint8_t x, uint8_t y, uint8_t idx) {
 
   switch (idx) {
     case 0:
-      memcpy(buffer, vtx_get_band_name(tempBand), 8);
+      if(tempBand) {
+        memcpy(buffer, vtx_get_band_name(tempBand - 1), 8);
+      } else {
+        sprintf(buffer, "DIRECT F");
+      }
       break;
     case 1:
-      sprintf(buffer, "%1i", tempChannel + 1);
+      sprintf(buffer, "%1i   ", tempChannel);
       break;
     case 2:
-      sprintf(buffer, "%1i",vtx_get_frequency(tempBand, tempChannel) );
+      if(tempBand) {
+        sprintf(buffer, "%1i",vtx_get_frequency(tempBand - 1, tempChannel - 1) );
+      } else {
+        sprintf(buffer, "%1i",vtx_get_config()->frequency);
+      }
       break;
     case 3:
       sprintf(buffer, "%i MW  ",vtx_get_power_mw() );
@@ -80,15 +88,15 @@ void changeChannel(ButtonEvent_e btn, uint8_t idx) {
   switch (idx) {
     case 0:
        if (btn == BTN_RIGHT)
-        tempBand = (tempBand + 1) % vtx_get_band_count();
+        tempBand = ((tempBand) % vtx_get_band_count()) + 1;
       else
-        tempBand = (vtx_get_band_count() + tempBand - 1) % vtx_get_band_count();
+        tempBand = ((vtx_get_band_count() + tempBand - 2 ) % vtx_get_band_count()) + 1;
       break;
     case 1:
       if (btn == BTN_RIGHT)
-        tempChannel = (tempChannel + 1) % 8;
+        tempChannel = ((tempChannel ) % 8) + 1;
       else
-        tempChannel = (8 + tempChannel - 1) % 8;
+        tempChannel = ((8 + tempChannel - 2) % 8) + 1;
       break;
     default:
       break;
@@ -99,10 +107,10 @@ void changePower(ButtonEvent_e btn, uint8_t __attribute__((unused)) idx) {
   uint8_t power;
 
   if (btn == BTN_RIGHT)
-    power = (vtx_get_config()->power + 1) % rf_pa_power_count();
+    power = ((vtx_get_config()->power) % rf_pa_power_count()) + 1;
   else
-    power = (rf_pa_power_count() + vtx_get_config()->power - 1) % rf_pa_power_count();
-  vtx_set_power(power + 1);
+    power = ((rf_pa_power_count() + vtx_get_config()->power - 2) % rf_pa_power_count()) + 1;
+  vtx_set_power(power);
 }
 
 void changePit(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__((unused)) idx) {
@@ -112,20 +120,20 @@ void changePit(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__(
 }
 
 void changeDisplayport(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__((unused)) idx) {
-  /*if (tempDisplayport) {
+  if (tempDisplayport) {
     tempDisplayport = 0;
-    setSyncMode(INTERNAL);
   } else {
     tempDisplayport = 1;
-    setSyncMode(AUTOMATIC);
-  }*/
+  }
 }
 
 void exitVtxMenu(ButtonEvent_e btn, uint8_t idx) {
   if (btn == BTN_RIGHT) {
-    osdState = OSD_EXIT_VTX;
+    osdState = OSD_EXIT_MENU;
     if (idx == MENUE_SIZE - 1) {
       vtx_set_band_channel(tempBand, tempChannel);
+      displayport_enabled = tempDisplayport;
+      settings_save();
     }
   }
 }
@@ -147,17 +155,18 @@ void msp_menu(void) {
 
   static uint8_t selectedEntry = 0;
 
-  if ((osdState == OSD_MSP) && (btn == BTN_ENTER_VTX)) {
-    osdState = OSD_VTX;
+  if ((osdState == OSD_MSP || osdState == OSD_OFF) && (btn == BTN_ENTER_VTX) && !fcArmed) {
+    osdState = OSD_MENU;
     selectedEntry = 0;
     btnLast = BTN_INVALID;
     tempChannel = vtx_get_config()->channel;
     tempBand = vtx_get_config()->band;
-    tempDisplayport = 1;
+    tempDisplayport = displayport_enabled;
     show_logo = false;
 
     TRACE_INFO("osdState = OSD_VTX %i\n", osdState);
 
+    setSyncMode(AUTOMATIC);
     canvas_char_clean();
     for (uint8_t i = 0; i < MENUE_SIZE; i++) {
       canvas_print(OSD_MENU_TEXT_LEFT, OSD_MENU_TOP + i, osdMenue[i].text);
@@ -175,19 +184,21 @@ void msp_menu(void) {
     
   }
 
-  if ((osdState == OSD_VTX && fcArmed) || (osdState == OSD_EXIT_VTX)) {
+  if ((osdState == OSD_MENU && fcArmed) || (osdState == OSD_EXIT_MENU)) {
     TRACE_INFO("osdState = OSD_MSP\n");
     canvas_char_clean();
     canvas_char_draw_complete();
-    osdState = OSD_MSP;
-    /*if (myEEPROM.displayport)
+    
+    if (displayport_enabled) {
       setSyncMode(AUTOMATIC);
-    else
+      osdState = OSD_MSP;
+    } else {
       setSyncMode(OFF);
-    */
+      osdState = OSD_OFF;
+    }
   }
 
-  if (osdState != OSD_VTX) {
+  if (osdState != OSD_MENU) {
     btnLast = btn;
     return;
   }
@@ -196,7 +207,7 @@ void msp_menu(void) {
     if (osdMenue[selectedEntry].keyFunc != NULL) {
       osdMenue[selectedEntry].keyFunc(btn, selectedEntry);
       for (uint8_t i = 0; i < MENUE_SIZE; i++) {
-        if (osdState == OSD_VTX && osdMenue[i].printFunc != NULL)
+        if (osdState == OSD_MENU && osdMenue[i].printFunc != NULL)
           osdMenue[i].printFunc(OSD_MENU_VALUE_LEFT ,OSD_MENU_TOP + i, i);
       }
     }

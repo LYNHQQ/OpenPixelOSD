@@ -58,6 +58,8 @@ syncState_t syncState = SYNC_STATE_SEARCH;
 uint16_t sync_voltage = SYNC_START_MV;
 uint16_t sync_voltage_black = SYNC_START_MV;
 uint16_t sync_voltage_low = 0;
+osdState_e osdState = OSD_INIT;
+bool displayport_enabled = true;
 
 static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORLD/WORLD
 static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORLD/WORLD
@@ -169,6 +171,13 @@ void video_overlay_init(void)
     show_version();
     video_gen_enabled = true;
     video_gen_stop();
+    if (displayport_enabled) {
+      setSyncMode(AUTOMATIC);
+      osdState = OSD_MSP;
+    } else {
+      setSyncMode(OFF);
+      osdState = OSD_OFF;
+    }
 
 }
 

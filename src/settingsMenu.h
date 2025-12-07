@@ -14,16 +14,6 @@ typedef enum {
     BTN_INVALID
 } ButtonEvent_e;
 
-typedef enum {
-  OSD_INIT,
-  OSD_OFF,  
-  OSD_MSP,
-  OSD_VTX,
-  OSD_EXIT_VTX
-} osdState_e;
-
-extern osdState_e osdState;
-
 typedef void (*osdPrintFuncPtr)(uint8_t x, uint8_t y, uint8_t idx);
 typedef void (*osdKeyFuncPtr)(ButtonEvent_e btn, uint8_t idx);
 

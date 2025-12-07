@@ -127,7 +127,8 @@ if(BUILD_VARIANT STREQUAL "VTX")
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/msp/mspMenu.c)
+            ./src/settings.c
+            ./src/settingsMenu.c)
 endif()
 
 add_compile_definitions(

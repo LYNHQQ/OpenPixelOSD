@@ -27,7 +27,8 @@ typedef enum {
     MSP_DISPLAYPORT_DRAW_STRING,
     MSP_DISPLAYPORT_DRAW_SCREEN,
     MSP_DISPLAYPORT_SET_OPTIONS,
-    MSP_DISPLAYPORT_DRAW_SYSTEM
+    MSP_DISPLAYPORT_DRAW_SYSTEM,
+    MSP_DISPLAYPORT_FONTCHAR_WRITE
 } msp_displayport_cmd_t;
 
 extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
@@ -125,6 +126,9 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
                     canvas_char_draw_complete();
                     break;
                 case MSP_DISPLAYPORT_SET_OPTIONS: // 5 -> Set Options (HDZero/iNav)
+                    break;
+                case MSP_DISPLAYPORT_FONTCHAR_WRITE:
+                    update_font_symbol_write_bulk(payload[1], &payload[4], data_size - 4);
                     break;
                 default:
                     break;

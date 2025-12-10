@@ -8,6 +8,7 @@
 #include "canvas_char.h"
 #include "fonts/update_font.h"
 #include "main.h"
+#include "settings.h"
 #include "msp.h"
 #include "uart.h"
 #include "usb.h"
@@ -36,9 +37,11 @@ extern uint8_t active_buffer;
 extern uint8_t paint_buffer;
 extern bool show_logo;
 
-extern uint8_t fcArmed;
 extern uint16_t rcChannel[4];
 extern uint8_t stickPos;
+
+fc_status_t fcStatus;
+uint8_t boxIdIdx = 0;
 
 CCMRAM_BSS static msp_port_t msp_uart = {0};
 CCMRAM_BSS static msp_port_t msp_usb = {0};
@@ -57,6 +60,8 @@ void msp_displayport_init(void)
 
     msp_usb.callback = msp_callback;
     msp_usb.owner = MSP_OWNER_USB;
+
+    vtx_msp_send_command(MSP_OWNER_UART, MSP_BOXIDS);
 }
 
 uint8_t mspStickpos(void) {
@@ -73,6 +78,8 @@ uint8_t mspStickpos(void) {
 
 EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
+    uint32_t status;
+    
     switch(msp_version) {
     case MSP_V1: {
         switch(msp_cmd) {
@@ -159,12 +166,36 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
             break;
 #if defined(BUILD_VARIANT_VTX)
         case MSP_STATUS:
-          if ( !fcArmed && (payload[6] & 0x01)) {
+          memcpy(&status,&payload[6],4);
+
+          if ( !fcStatus.armed && (status & 0x01)) {
               TRACE_INFO("FC ARMED\n");
-              fcArmed = 1;
-          } else if ( fcArmed && !(payload[6] & 0x01)) {
+              fcStatus.armed = 1;
+          } else if ( fcStatus.armed && !(status & 0x01)) {
               TRACE_INFO("FC DISARMED\n");
-              fcArmed = 0;
+              fcStatus.armed = 0;
+          }
+
+          if (boxIdIdx) {
+            if(!fcStatus.cameraControl && (status & 1<<boxIdIdx)) {
+              fcStatus.cameraControl = 1;
+              TRACE_INFO("CAM SWITCH on\n");
+              if (settings.camswitchEnabled)
+                set_video_input(1);
+            } else if (fcStatus.cameraControl && !(status & 1<<boxIdIdx)) {
+              fcStatus.cameraControl = 0;
+              TRACE_INFO("CAM SWITCH off\n");
+              if (settings.camswitchEnabled)
+                set_video_input(0);
+            }
+          }
+          break;
+        case MSP_BOXIDS:
+          for (uint16_t i = 0; i < data_size; i++) {
+            if (BOXID_CAM_SWITCH && (payload[i] == BOXID_CAM_SWITCH)) {
+              boxIdIdx = i;
+              TRACE_INFO("BOXID IDX CAM SWITCH %02x\n", i)
+            }
           }
           break;
         case MSP_RC:
@@ -267,7 +298,7 @@ EXEC_RAM void msp_loop_process(void)
     static uint32_t last_tick = 0;
     static uint8_t configRequest = 2;
     static uint8_t c = 0;
-    if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL + (fcArmed * 900))) {
+    if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL)) {
         last_tick = HAL_GetTick();
         switch(c) {
           case 0:
@@ -277,7 +308,7 @@ EXEC_RAM void msp_loop_process(void)
             break;
           case 1:
             vtx_msp_send_command(MSP_OWNER_UART, MSP_STATUS);
-            c = c + (1 - fcArmed);
+            c = c + (!fcStatus.armed);
             break;
           case 3:
             if (!vtx_get_config()->configSet) {

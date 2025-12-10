@@ -13,6 +13,14 @@
 #define MSP_PORT_BUFF_SIZE    192
 #define MSP_V2_FRAME_ID       255
 
+#define MSP_BOXID_CAMERA_CONTROL_1    32
+#define MSP_BOXID_CAMERA_CONTROL_2    33
+#define MSP_BOXID_CAMERA_CONTROL_3    34
+#define MSP_BOXID_USER1               40
+#define MSP_BOXID_USER2               41
+#define MSP_BOXID_USER3               42
+#define MSP_BOXID_USER4               43
+
 typedef enum {
     MSP_IDLE,
     MSP_HEADER_START,

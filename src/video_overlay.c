@@ -8,6 +8,7 @@
 #include "video_overlay.h"
 #include "system.h"
 #include "main.h"
+#include "settings.h"
 #include "video_gen.h"
 #include "logo/logo.h"
 #include "canvas_char.h"
@@ -20,8 +21,8 @@
 
 // OPAMP1 multiplexer constants
 #define OPAMP_CONST_IO0     0x108000E1U  // Positive Input IO0 (e.g., PA1) -
-#define OPAMP_CONST_IO1     ((VIDEO_TOTAL_GAIN / VIDEO2_INPUT_GAIN) == 1 ? 0x108000E5U : 0x108000C5U)   // Positive Input IO1 (e.g., PA3) - video generator input
-#define OPAMP_CONST_IO2     ((VIDEO_TOTAL_GAIN / VIDEO1_INPUT_GAIN) == 1 ? 0x108000E9U : 0x108000C9U)  // Positive Input IO2 (e.g., PA7) - video input form camera
+#define OPAMP_CONST_IO1     ((VIDEO_TOTAL_GAIN / VIDEO1_INPUT_GAIN) == 1 ? 0x108000E5U : 0x108000C5U)  // Positive Input IO1 (e.g., PA3) - video generator input
+#define OPAMP_CONST_IO2     ((VIDEO_TOTAL_GAIN / VIDEO2_INPUT_GAIN) == 1 ? 0x108000E9U : 0x108000C9U)  // Positive Input IO2 (e.g., PA7) - video input form camera
 
 #define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC)
 
@@ -59,12 +60,15 @@ uint16_t sync_voltage = SYNC_START_MV;
 uint16_t sync_voltage_black = SYNC_START_MV;
 uint16_t sync_voltage_low = 0;
 osdState_e osdState = OSD_INIT;
-bool displayport_enabled = true;
+
+videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
+                                {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
+uint8_t activeVideoInput;
 
 static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORLD/WORLD
 static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORLD/WORLD
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
-CCMRAM_DATA static uint32_t video_source = VIDOE_OPAMP_IMPUT;
+CCMRAM_DATA static uint32_t video_source;
 extern volatile bool video_gen_enabled;
 extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
@@ -110,6 +114,29 @@ EXEC_RAM static void init_buffers()
     }
 }
 
+EXEC_RAM static void set_video_source(uint32_t source)
+{
+  video_source = source;
+  opa_val[1] = source;
+  opa_val[5] = source;
+  OPAMP1->CSR = source;
+}
+
+void set_video_input(uint8_t input)
+{
+  if(input)
+    activeVideoInput = 1;
+  else
+    activeVideoInput = 0;
+
+  if(video_source == videoInputs[1 - activeVideoInput].opampInput) {
+    set_video_source(videoInputs[activeVideoInput].opampInput);
+    syncState = SYNC_STATE_SEARCH;
+  }
+
+  LL_COMP_SetInputPlus(COMP2, videoInputs[activeVideoInput].compInput);
+}
+
 static void show_version(void)
 {
     char str[COLUMN_SIZE];
@@ -146,7 +173,6 @@ void video_overlay_init(void)
 
     LL_OPAMP_Enable(OPAMP1);
     LL_OPAMP_Enable(OPAMP3);
-    
 
     LL_COMP_Enable(COMP2);
     LL_COMP_Enable(COMP3);
@@ -161,17 +187,16 @@ void video_overlay_init(void)
     LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_1);
     LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_2);
 
-    //LL_TIM_EnableIT_UPDATE(TIM4);
-    //LL_TIM_EnableCounter(TIM4);
-
     LL_TIM_EnableIT_UPDATE(TIM17);
 
-    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, (DAC12BIT_FROM_MV(SYNC_START_MV)) * VIDEO_INPUT_GAIN);
+    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, (DAC12BIT_FROM_MV(SYNC_START_MV)) * videoInputs[activeVideoInput].gain);
 
     show_version();
     video_gen_enabled = true;
     video_gen_stop();
-    if (displayport_enabled) {
+    set_video_input(settings.activeVideoInput);
+    if (settings.displayportEnabled) {
+      set_video_source(videoInputs[activeVideoInput].opampInput);
       setSyncMode(AUTOMATIC);
       osdState = OSD_MSP;
     } else {
@@ -188,7 +213,7 @@ void scan_sync_voltage() {
       sync_voltage = SYNC_SCAN_MIN_MV;
     } 
 
-    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * VIDEO_INPUT_GAIN);
+    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
 }
 
 
@@ -436,7 +461,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           
           if((syncState == SYNC_STATE_EXTERNAL) && (sync_voltage_black > sync_voltage_low) && (sync_voltage_black - sync_voltage_low > 100)) {
             sync_voltage = (sync_voltage_black + sync_voltage_low) / 2;
-            LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * VIDEO_INPUT_GAIN);
+            LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
           }
         }
     } else if (time_ns > 56.0f && time_ns < 58.0f) {
@@ -505,10 +530,7 @@ EXEC_RAM void TIM2_IRQHandler(void)
           }
 
           if (syncState == SYNC_STATE_FOUND) {
-            video_source = VIDOE_OPAMP_IMPUT;
-            opa_val[1] = video_source;
-            opa_val[5] = VIDOE_OPAMP_IMPUT;
-            OPAMP1->CSR = video_source;
+            set_video_source(videoInputs[activeVideoInput].opampInput);
             if (video_gen_enabled == true) {
                 video_gen_stop();
             }
@@ -531,10 +553,7 @@ EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
       if(DMA1_Channel5->CNDTR == 1) {
         ARR_prev += TIM17->ARR;
       } else {
-        video_source = OPAMP_CONST_DAC;
-        opa_val[1] = video_source;
-        opa_val[5] = OPAMP_CONST_DAC;
-        OPAMP1->CSR = video_source;
+        set_video_source(OPAMP_CONST_DAC);
         if (video_gen_enabled == false) {
             set_black_level(DAC_BLACK);
             video_gen_start();
@@ -566,10 +585,10 @@ void video_sync_loop(void) {
     if(syncState == SYNC_STATE_EXTERNAL) {
       if(last_frame == frame_counter) {
         if(!--sync_lost) {
+          TRACE_INFO("Sync lost\n");
           syncState = SYNC_STATE_SEARCH;
           if (syncMode == AUTOMATIC) {
-            video_source = OPAMP_CONST_DAC;
-            OPAMP1->CSR = video_source;
+            set_video_source(OPAMP_CONST_DAC);
             set_black_level(DAC_BLACK);
             video_gen_start();
           }
@@ -597,18 +616,13 @@ void setSyncMode(syncMode_t mode) {
       syncMode = EXTERNAL;
       break;
     case INTERNAL:
-      video_source = OPAMP_CONST_DAC;
-      OPAMP1->CSR = video_source;
+      set_video_source(OPAMP_CONST_DAC);
       set_black_level(DAC_BLACK);
       video_gen_start();
       syncMode = INTERNAL;
       break;
     case OFF:
-      video_source = VIDOE_OPAMP_IMPUT;
-      opa_val[1] = video_source;
-      opa_val[5] = VIDOE_OPAMP_IMPUT;
-      OPAMP1->CSR = video_source;
-      //LL_TIM_DisableCounter(TIM8);
+      set_video_source(videoInputs[activeVideoInput].opampInput);
       if (video_gen_enabled == true) {
           video_gen_stop();
       }

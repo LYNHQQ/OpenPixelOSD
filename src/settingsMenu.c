@@ -7,6 +7,7 @@
 #include "canvas_char.h"
 #include "rf_pa.h"
 #include "video_overlay.h"
+#include "msp_displayport.h"
 
 #define OSD_MENU_TOP                2
 #define OSD_MENU_TEXT_LEFT          2
@@ -14,11 +15,10 @@
 
 uint8_t tempChannel;
 uint8_t tempBand;
-uint8_t tempDisplayport;
+uint8_t tempVideoInput;
 
 uint16_t rcChannel[4] = {1500};
 uint8_t stickPos = 0;
-uint8_t fcArmed = 0;
 
 extern CCMRAM_DATA bool show_logo;
 
@@ -29,6 +29,7 @@ void exitVtxMenu(ButtonEvent_e btn, uint8_t idx);
 void exitVtxMenu(ButtonEvent_e btn, uint8_t idx);
 void changePit(ButtonEvent_e btn, uint8_t idx);
 void changeDisplayport(ButtonEvent_e btn, uint8_t idx);
+void changeVideoIn(ButtonEvent_e btn, uint8_t idx);
 
 osdEntry_t osdMenue[] = { {"BAND",        (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeChannel},
                           {"CHANNEL",     (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeChannel},
@@ -36,6 +37,7 @@ osdEntry_t osdMenue[] = { {"BAND",        (osdPrintFuncPtr)printMenuValue,    (o
                           {"POWER",       (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePower},
                           {"PIT MODE",    (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePit},
                           {"DISPLAYPORT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeDisplayport},
+                          {"VIDEO INPUT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeVideoIn},
                           {"EXIT",        NULL,                               (osdKeyFuncPtr)exitVtxMenu},
                           {"SAVE+EXIT",   NULL,                               (osdKeyFuncPtr)exitVtxMenu}};
 
@@ -72,10 +74,18 @@ void printMenuValue(uint8_t x, uint8_t y, uint8_t idx) {
         sprintf(buffer, "OFF");
       break;
     case 5:
-      if (tempDisplayport)
+      if (settings.displayportEnabled)
         sprintf(buffer, "ON ");
       else
         sprintf(buffer, "OFF");
+      break;
+    case 6:
+      if (tempVideoInput == 0)
+        sprintf(buffer, "INPUT 1 ");
+      else if (tempVideoInput == 1)
+        sprintf(buffer, "INPUT 2 ");
+      else
+        sprintf(buffer, "CAM CTRL");
       break;
     default:
       break;
@@ -120,10 +130,27 @@ void changePit(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__(
 }
 
 void changeDisplayport(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__((unused)) idx) {
-  if (tempDisplayport) {
-    tempDisplayport = 0;
-  } else {
-    tempDisplayport = 1;
+  settings.displayportEnabled = !settings.displayportEnabled;
+}
+
+void changeVideoIn(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__((unused)) idx) {
+  if (btn == BTN_RIGHT)
+    tempVideoInput = (tempVideoInput + 1) % 3;
+  else
+    tempVideoInput = (3 + tempVideoInput -1) % 3;
+  
+  if(tempVideoInput == 0) {
+    set_video_input(0);
+    settings.activeVideoInput = 0;
+    settings.camswitchEnabled = false;
+  } if(tempVideoInput == 1) {
+    set_video_input(1);
+    settings.activeVideoInput = 1;
+    settings.camswitchEnabled = false;
+  } if(tempVideoInput == 2) {
+    set_video_input(fcStatus.cameraControl);
+    settings.activeVideoInput = 0;
+    settings.camswitchEnabled = true;
   }
 }
 
@@ -132,7 +159,6 @@ void exitVtxMenu(ButtonEvent_e btn, uint8_t idx) {
     osdState = OSD_EXIT_MENU;
     if (idx == MENUE_SIZE - 1) {
       vtx_set_band_channel(tempBand, tempChannel);
-      displayport_enabled = tempDisplayport;
       settings_save();
     }
   }
@@ -155,14 +181,18 @@ void msp_menu(void) {
 
   static uint8_t selectedEntry = 0;
 
-  if ((osdState == OSD_MSP || osdState == OSD_OFF) && (btn == BTN_ENTER_VTX) && !fcArmed) {
+  if ((osdState == OSD_MSP || osdState == OSD_OFF) && (btn == BTN_ENTER_VTX) && fcStatus.armed) {
     osdState = OSD_MENU;
     selectedEntry = 0;
     btnLast = BTN_INVALID;
     tempChannel = vtx_get_config()->channel;
     tempBand = vtx_get_config()->band;
-    tempDisplayport = displayport_enabled;
     show_logo = false;
+
+    if (settings.camswitchEnabled)
+      tempVideoInput = 2;
+    else
+      tempVideoInput = settings.activeVideoInput;
 
     TRACE_INFO("osdState = OSD_VTX %i\n", osdState);
 
@@ -184,12 +214,12 @@ void msp_menu(void) {
     
   }
 
-  if ((osdState == OSD_MENU && fcArmed) || (osdState == OSD_EXIT_MENU)) {
+  if ((osdState == OSD_MENU && fcStatus.armed) || (osdState == OSD_EXIT_MENU)) {
     TRACE_INFO("osdState = OSD_MSP\n");
     canvas_char_clean();
     canvas_char_draw_complete();
     
-    if (displayport_enabled) {
+    if (settings.displayportEnabled) {
       setSyncMode(AUTOMATIC);
       osdState = OSD_MSP;
     } else {

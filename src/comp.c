@@ -14,7 +14,7 @@ void COMP2_Init(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(COMP_INP_VIDEO_SYNC_IN_GPIO_Port, &GPIO_InitStruct);*/
 
-    COMP_InitStruct.InputPlus = VIDEO_SYNC_COMP_IMPUT;
+    //COMP_InitStruct.InputPlus = VIDEO_SYNC_COMP_IMPUT;
     COMP_InitStruct.InputMinus = LL_COMP_INPUT_MINUS_DAC3_CH2;
     COMP_InitStruct.InputHysteresis = LL_COMP_HYSTERESIS_20MV;
     COMP_InitStruct.OutputPolarity = LL_COMP_OUTPUTPOL_NONINVERTED;

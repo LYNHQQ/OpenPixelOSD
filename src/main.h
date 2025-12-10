@@ -139,22 +139,11 @@ typedef enum {
 
 #define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
 
-#define VIDEO_INPUT                             2
-
-#define VIDEO1_INPUT_GAIN                       1
-#define VIDEO2_INPUT_GAIN                       2
+#define VIDEO1_INPUT_GAIN                       2
+#define VIDEO2_INPUT_GAIN                       1
 #define VIDEO_TOTAL_GAIN                        2
 
-
-#if VIDEO_INPUT == 1
-#define VIDEO_SYNC_COMP_IMPUT                   LL_COMP_INPUT_PLUS_IO1
-#define VIDOE_OPAMP_IMPUT                       OPAMP_CONST_IO2
-#define VIDEO_INPUT_GAIN                        VIDEO1_INPUT_GAIN
-#else
-#define VIDEO_SYNC_COMP_IMPUT                   LL_COMP_INPUT_PLUS_IO2
-#define VIDOE_OPAMP_IMPUT                       OPAMP_CONST_IO1
-#define VIDEO_INPUT_GAIN                        VIDEO2_INPUT_GAIN
-#endif
+#define BOXID_CAM_SWITCH                        MSP_BOXID_CAMERA_CONTROL_1
 
 void gpio_init(void);
 void adc_init(void);

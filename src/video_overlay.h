@@ -26,11 +26,18 @@ typedef enum {
   OSD_EXIT_MENU
 } osdState_e;
 
-extern osdState_e osdState;
-extern bool displayport_enabled;
+typedef struct {
+    uint32_t  compInput;
+    uint32_t  opampInput;
+    uint8_t   gain;
+} videoInput_t;
 
+extern osdState_e osdState;
+
+void set_video_input(uint8_t input);
 void video_overlay_init(void);
 void video_sync_loop(void);
 void setSyncMode(syncMode_t mode);
+void set_video_input(uint8_t input);
 
 #endif //VIDEO_OVERLAY_H

@@ -126,7 +126,7 @@ typedef enum {
 
 #define SYNC_LOST_FRAMES_THRESHOLD              20
 
-
+//Set input gain and total gain to 2 if FMS6141 video filter is used
 #define VIDEO1_INPUT_GAIN                       2
 #define VIDEO2_INPUT_GAIN                       1
 #define VIDEO_TOTAL_GAIN                        2

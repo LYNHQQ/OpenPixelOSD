@@ -8,17 +8,15 @@
 #include "rf_pa.h"
 #include "video_overlay.h"
 #include "msp_displayport.h"
+#include "msp_fc.h"
 
 #define OSD_MENU_TOP                2
-#define OSD_MENU_TEXT_LEFT          2
-#define OSD_MENU_VALUE_LEFT         16
+#define OSD_MENU_TEXT_LEFT          ((COLUMN_SIZE - 26) / 2)
+#define OSD_MENU_VALUE_LEFT         (OSD_MENU_TEXT_LEFT + 14 )
 
 uint8_t tempChannel;
 uint8_t tempBand;
 uint8_t tempVideoInput;
-
-uint16_t rcChannel[4] = {1500};
-uint8_t stickPos = 0;
 
 extern CCMRAM_DATA bool show_logo;
 
@@ -148,7 +146,7 @@ void changeVideoIn(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribut
     settings.activeVideoInput = 1;
     settings.camswitchEnabled = false;
   } if(tempVideoInput == 2) {
-    set_video_input(fcStatus.cameraControl);
+    set_video_input(fc.status.cameraControl);
     settings.activeVideoInput = 0;
     settings.camswitchEnabled = true;
   }
@@ -169,19 +167,19 @@ void msp_menu(void) {
   static ButtonEvent_e btn = BTN_INVALID;
   static ButtonEvent_e btnLast = BTN_INVALID;
 
-  if      (stickPos == 0x20)            btn = BTN_ENTER;
-  else if (stickPos == 0x10)            btn = BTN_EXIT;
-  else if (stickPos == 0x65)            btn = BTN_ENTER_VTX;
-  else if ((stickPos & 0x0f) == 0x00)   btn = BTN_MID;
-  else if ((stickPos & 0x0f) == 0x01)   btn = BTN_LEFT;
-  else if ((stickPos & 0x0f) == 0x02)   btn = BTN_RIGHT;
-  else if ((stickPos & 0x0f) == 0x04)   btn = BTN_DOWN;
-  else if ((stickPos & 0x0f) == 0x08)   btn = BTN_UP;
+  if      (fc.stickPos == 0x20)            btn = BTN_ENTER;
+  else if (fc.stickPos == 0x10)            btn = BTN_EXIT;
+  else if (fc.stickPos == 0x65)            btn = BTN_ENTER_VTX;
+  else if ((fc.stickPos & 0x0f) == 0x00)   btn = BTN_MID;
+  else if ((fc.stickPos & 0x0f) == 0x01)   btn = BTN_LEFT;
+  else if ((fc.stickPos & 0x0f) == 0x02)   btn = BTN_RIGHT;
+  else if ((fc.stickPos & 0x0f) == 0x04)   btn = BTN_DOWN;
+  else if ((fc.stickPos & 0x0f) == 0x08)   btn = BTN_UP;
   else                                  btn = BTN_INVALID;
 
   static uint8_t selectedEntry = 0;
 
-  if ((osdState == OSD_MSP || osdState == OSD_OFF) && (btn == BTN_ENTER_VTX) && fcStatus.armed) {
+  if ((osdState == OSD_MSP || osdState == OSD_OFF) && (btn == BTN_ENTER_VTX) && !fc.status.armed) {
     osdState = OSD_MENU;
     selectedEntry = 0;
     btnLast = BTN_INVALID;
@@ -214,7 +212,7 @@ void msp_menu(void) {
     
   }
 
-  if ((osdState == OSD_MENU && fcStatus.armed) || (osdState == OSD_EXIT_MENU)) {
+  if ((osdState == OSD_MENU && fc.status.armed) || (osdState == OSD_EXIT_MENU)) {
     TRACE_INFO("osdState = OSD_MSP\n");
     canvas_char_clean();
     canvas_char_draw_complete();

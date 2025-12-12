@@ -7,6 +7,73 @@
 #include <stdio.h>
 #include "main.h"
 #include "msp.h"
+#include "settings.h"
+#include "msp_fc.h"
+#include "msp_displayport.h"
+#include "uart.h"
+#include "usb.h"
+
+#if defined(BUILD_VARIANT_VTX)
+#include "vtx_msp.h"
+#define MSP_REQUEST_LOOP_INTERVAL 100u
+#endif
+
+CCMRAM_BSS static msp_port_t msp_uart = {0};
+CCMRAM_BSS static msp_port_t msp_usb = {0};
+EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload);
+
+
+void msp_init(void)
+{
+    uart1_init();
+    uart1_dma_rx_start();
+    msp_uart.callback = msp_callback;
+    msp_uart.owner = MSP_OWNER_UART;
+
+    msp_usb.callback = msp_callback;
+    msp_usb.owner = MSP_OWNER_USB;
+
+    vtx_msp_send_command(MSP_OWNER_UART, MSP_BOXIDS);
+}
+
+EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
+{
+    UNUSED(msp_version);
+
+    switch(msp_cmd) {
+    case MSP_DISPLAYPORT: 
+    case MSP_OSD_CHAR_WRITE:
+        msp_displayport_handle_msp(owner, msp_cmd, data_size, payload);
+        break;
+
+    case MSP_VTX_CONFIG:
+    case MSP_SET_VTX_CONFIG:
+    case MSP_VTXTABLE_BAND:
+    case MSP_VTXTABLE_POWERLEVEL:
+#if defined(BUILD_VARIANT_VTX)
+        vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
+#endif
+        break;
+    case MSP_STATUS:
+    case MSP_BOXIDS:
+    case MSP_RC:
+    case MSP_DEBUG:
+        msp_fc_handle_msp(owner, msp_cmd, data_size, payload);
+        break;
+    default:
+        printf("MSP command not parsed %d:0x%02X\r\n",msp_cmd, msp_cmd);
+        break;
+    }
+      
+#if 0 // debug msp via usb-cdc
+    for(int i = 0; i < data_size; i++) {
+        printf("0x%02x ", payload[i]);
+    }
+    printf("\r\n");
+#endif
+
+}
+
 
 EXEC_RAM static uint8_t crc8_calc(uint8_t crc, unsigned char a, uint8_t poly)
 {
@@ -274,4 +341,49 @@ uint16_t construct_msp_command_v2(uint8_t message_buffer[], uint16_t function, c
     printf("crc: %02X\n", checksum);
 #endif
     return len;
+}
+
+EXEC_RAM void msp_loop_process(void)
+{
+    uint8_t byte;
+    while (uart_rx_ring_get(&byte)) {
+        msp_process_received_data(&msp_uart, byte);
+    }
+    while (usb_uart_read_byte(&byte)) {
+        msp_process_received_data(&msp_usb, byte);
+    }
+
+#if defined(BUILD_VARIANT_VTX)
+    static uint32_t last_tick = 0;
+    static uint8_t configRequest = 2;
+    static uint8_t c = 0;
+    if ((HAL_GetTick() - last_tick) >= (MSP_REQUEST_LOOP_INTERVAL)) {
+        last_tick = HAL_GetTick();
+        switch(c) {
+          case 0:
+          case 2:
+            vtx_msp_send_command(MSP_OWNER_UART, MSP_RC);
+            c++;
+            break;
+          case 1:
+            vtx_msp_send_command(MSP_OWNER_UART, MSP_STATUS);
+            c = c + (!fc.status.armed);
+            break;
+          case 3:
+            if (!vtx_get_config()->configSet) {
+              if(configRequest) {
+                vtx_msp_request_config(MSP_OWNER_UART);
+                configRequest--;
+              } else {
+                vtx_set_pitmode(0);
+                vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
+                vtx_config->configSet = 1;
+              }
+            } 
+            c = 0;
+            break;
+        }
+        
+    }
+#endif
 }

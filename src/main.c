@@ -3,7 +3,8 @@
  * Copyright (C) 2025 Vitaliy N <vitaliy.nimych@gmail.com>
  */
 #include "main.h"
-#include "msp_displayport.h"
+#include "msp.h"
+#include "msp_fc.h"
 #include "system.h"
 #include "usb.h"
 #include "video_gen.h"
@@ -32,12 +33,9 @@ extern bool new_field;
 void led_blink(void);
 
 extern volatile uint16_t sync_voltage;
-extern uint16_t sync_voltage_black;
 extern uint16_t sync_voltage_low;
 extern uint16_t video_level[];
-extern syncState_t syncState;
 extern double rf_detector;
-extern uint8_t stickPos;
 
 void debug_print_loop(void)
 {
@@ -46,13 +44,12 @@ void debug_print_loop(void)
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
         uint16_t rf_detect_int = rf_detector;
-        TRACE_INFO("stickPos:%x sync V:%i bl: %i sync bl:%i sync low:%i adc_1:%i\n",
-          stickPos,
+        TRACE_INFO("sync V:%i bl: %i sync low:%i adc_PA:%i adc_5V:%i\n",
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
-          sync_voltage_black,
           sync_voltage_low,
-          rf_detect_int); // Loop debug printf here
+          rf_detect_int,
+          adc_read_mv(1) * 2); // Loop debug printf here
     }
 }
 
@@ -81,11 +78,11 @@ int main (void)
     video_draw_text_system_font(FONT_SYSTEM_WIDTH * 2, VIDEO_HEIGHT - FONT_SYSTEM_HEIGHT, "WAITING MSP...");
     video_graphics_draw_complete();
 #endif
-    msp_displayport_init();
+    msp_init();
 
 #if defined(BUILD_VARIANT_VTX)
     rf_pa_init();
-    if(rtc6705_init() || 1) {
+    if(rtc6705_init()) {
         printf("rtc6705 detected\r\n");
         vtx_set_pitmode(1);
         vtx_set_power(vtx_get_config()->power);

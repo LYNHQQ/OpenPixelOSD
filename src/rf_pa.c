@@ -213,9 +213,6 @@ void rf_pa_init(void)
     for (uint8_t idx = 1; idx <= NUM_PWR; idx++) {
       rf_pa_read_eeprom(idx);
     }
-
-    eeprom_dump();
-
 }
 
 void rf_pa_loop(void)

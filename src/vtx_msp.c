@@ -536,23 +536,23 @@ bool vtx_msp_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, con
     switch (msp_cmd) {
     case MSP_VTX_CONFIG:
         handle_msp_set_vtx_config(owner, payload, data_size);
-        return true;
+        break;
     
     case MSP_PACALTABLE:
         vtx_msp_push_calibration_table(owner);
-        return true;
+        break;
     
     case MSP_SET_PACALIBRATION:
         vtx_msp_set_calibration(owner, payload, data_size);
-        return true;
+        break;
 
     case MSP_SET_PACALTABLE:
         vtx_msp_set_calibration_table(owner, payload, data_size);
-        return true;
+        break;
     
     case MSP_EEPROM_WRITE:
         eeprom_save();
-        return true;
+        break;
 
     case MSP_SET_VTX_CONFIG:
     case MSP_VTXTABLE_BAND:
@@ -560,4 +560,12 @@ bool vtx_msp_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, con
     default:
         return false;
     }
+
+    const vtx_config_t *vtx_config = vtx_get_config();
+    if (!vtx_config->vtx_table_available) {
+        TRACE_INFO("Set Table defaults\n");
+        vtx_msp_clear_table_and_set_defaults(owner);
+        
+    }
+    return true;
 }

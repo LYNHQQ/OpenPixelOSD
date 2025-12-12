@@ -14,8 +14,8 @@ void OPAMP1_Init(void)
 
     /**OPAMP1 GPIO Configuration
     PA2   ------> OPAMP1_VOUT - Video output
-    PA3   ------> OPAMP1_VINM_SEC - Video 2 input
-    PA7   ------> OPAMP1_VINP - Camera Video input
+    PA3   ------> OPAMP1_VINP - Video 1 input
+    PA7   ------> OPAMP1_VINP - Video 2 input
     */
 
     GPIO_InitStruct.Pin = OPAMP1_VOUT_VIDEO_OUT_Pin;

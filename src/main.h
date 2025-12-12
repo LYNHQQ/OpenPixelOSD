@@ -40,33 +40,21 @@
 #endif /* MCU_TYPE */
 
 #define ROW_SIZE                                16
-#define COLUMN_SIZE                             30
+#define COLUMN_SIZE                             38
 
-#if COLUMN_SIZE == 30
-#define LINE_START_DELAY                        1047
-#define TIM1_AUTORELOAD                         24
-#elif COLUMN_SIZE == 32
-#define LINE_START_DELAY                        1146
-#define TIM1_AUTORELOAD                         21
-#elif COLUMN_SIZE == 36
-#define LINE_START_DELAY                        1075
-#define TIM1_AUTORELOAD                         19
-#elif COLUMN_SIZE == 40
-#define LINE_START_DELAY                        1077
-#define TIM1_AUTORELOAD                         17
-#elif COLUMN_SIZE == 42
-#define LINE_START_DELAY                        1088
-#define TIM1_AUTORELOAD                         16
-#else
-#undef COLUMN_SIZE
-#define COLUMN_SIZE                             30
-#define LINE_START_DELAY                        1046
-#define TIM1_AUTORELOAD                         24
-#endif
+#define VISUAL_PICTURE_LINE_NS                  49000
+#define LINE_START_DELAY_NS                     5500
 
-#define PEXELS_PER_LINE                         (COLUMN_SIZE * 12)
-#define BLACK_LEVEL_ADC_DELAY_US                3300
-#define LOW_SYNC_ADC_DELAY_US                   6000
+#define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
+#define VISUAL_PICTURE_LINE_TICKS_MAX           (NS_TO_TICKS(VISUAL_PICTURE_LINE_NS))
+#define PIXELS_PER_LINE                         (COLUMN_SIZE * 12)
+#define TIM1_AUTORELOAD                         ((uint32_t)(VISUAL_PICTURE_LINE_TICKS_MAX / PIXELS_PER_LINE))
+#define VISUAL_PICTURE_LINE_TICKS               (TIM1_AUTORELOAD * PIXELS_PER_LINE)
+#define LINE_START_DELAY                        ((VISUAL_PICTURE_LINE_TICKS_MAX - VISUAL_PICTURE_LINE_TICKS) / 2 + NS_TO_TICKS(LINE_START_DELAY_NS))
+
+
+#define BLACK_LEVEL_ADC_DELAY_NS                3300
+#define LOW_SYNC_ADC_DELAY_NS                   6000
 
 typedef enum {
   PX_BLACK = 0,
@@ -137,7 +125,6 @@ typedef enum {
 
 #define SYNC_LOST_FRAMES_THRESHOLD              20
 
-#define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
 
 #define VIDEO1_INPUT_GAIN                       2
 #define VIDEO2_INPUT_GAIN                       1

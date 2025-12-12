@@ -27,7 +27,7 @@
 #define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC)
 
 #define OFFSET_Y            (16)
-#define LINE_BUF_SZ         (PEXELS_PER_LINE+1)
+#define LINE_BUF_SZ         (PIXELS_PER_LINE+1)
 
 #define OFFSET_SYNC         300
 #define OFFSET_TRANSPARENT  100
@@ -140,10 +140,12 @@ void set_video_input(uint8_t input)
 static void show_version(void)
 {
     char str[COLUMN_SIZE];
-    sprintf(str, "FW: %s", FW_VERSION);
-    canvas_char_write(8, 9, str, strlen(str));
+    
     sprintf(str, "MCU: %s", MCU_TYPE);
-    canvas_char_write(8, 10, str, strlen(str));
+    uint8_t col = (COLUMN_SIZE - strlen(str)) / 2;
+    canvas_char_write(col, 10, str, strlen(str));
+    sprintf(str, "FW: %s", FW_VERSION);
+    canvas_char_write(col, 9, str, strlen(str));
     canvas_char_draw_complete();
 }
 
@@ -252,7 +254,7 @@ void render_overlay_logo_line(uint16_t line)
     uint16_t logo_row = line - LOGO_OFFSET_Y;
     const uint8_t *logo_line_ptr = &logo_data[logo_row * LOGO_ROW_BYTES];
 
-    uint32_t buf_idx_local = LOGO_OFFSET_X;
+    uint32_t buf_idx_local = (PIXELS_PER_LINE -LOGO_WIDTH) / 2;
     for (uint32_t i = 0; i < LOGO_WIDTH>>2; i++) {
         uint8_t byte = logo_line_ptr[i];
         uint8_t pixel;
@@ -288,9 +290,9 @@ void render_test_pattern_line(uint16_t line)
         // Line outside the logo area — do nothing, keep existing buffer contents
         return;
     }
-    uint8_t pattern = 0;
-
-    for (uint16_t buf_index = 0; buf_index < LINE_BUF_SZ - 32; buf_index += 8) {
+    uint8_t pattern = line / 18;
+    
+    for (uint16_t buf_index = 0; buf_index < LINE_BUF_SZ-12; buf_index += 12) {
 
         px_t px = pattern++ & 0x03;
 
@@ -300,7 +302,7 @@ void render_test_pattern_line(uint16_t line)
         }
 
         // Overlay — overwrite only if pixel is not transparent
-        for (uint8_t x = 0; x < 8; x++) {
+        for (uint8_t x = 0; x < 12; x++) {
           dac_buff[buf_idx][buf_index + x] = video_levels[px + 1];
           opamp_buff[buf_idx][buf_index+ x] = opa_vals[px];
         }
@@ -454,7 +456,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         vsync++;
         if (vsync == 5) {
           sync_voltage_low = DAC12BIT_TO_MV(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
-          LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(BLACK_LEVEL_ADC_DELAY_US));
+          LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(BLACK_LEVEL_ADC_DELAY_NS));
         }
         if (vsync == 11) {
           sync_voltage_black = DAC12BIT_TO_MV(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
@@ -468,7 +470,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         if (vsync >= 4) {
           vsync = 4;
           LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
-          LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(LOW_SYNC_ADC_DELAY_US));
+          LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(LOW_SYNC_ADC_DELAY_NS));
         }
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
         if (vsync == 8) {

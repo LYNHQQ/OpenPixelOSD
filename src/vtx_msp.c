@@ -287,16 +287,6 @@ static void handle_msp_set_vtx_config(uint8_t owner, const uint8_t *payload, uin
     (void) vtx_table_power_levels;
 }
 
-/* Small sender wrapper */
-static inline void msp_tx_send_owner(uint8_t owner, const uint8_t *buf, uint16_t len)
-{
-    if (owner == MSP_OWNER_USB) {
-        usb_uart_write_bytes((const char*)buf, len);
-    } else if (owner == MSP_OWNER_UART) {
-        uart1_tx_dma((uint8_t*)buf, len);
-    }
-}
-
 void vtx_msp_clear_table_and_set_defaults(uint8_t owner)
 {
     //if (g_cfg.vtx_table_available == 1) {
@@ -521,13 +511,6 @@ void vtx_msp_request_config(uint8_t owner)
 {
     uint8_t tx_buff[64];
     const uint16_t len = construct_msp_command_v1(tx_buff, MSP_VTX_CONFIG, NULL, 0, MSP_OUTBOUND);
-    msp_tx_send_owner(owner, tx_buff, len);
-}
-
-void vtx_msp_send_command(uint8_t owner, uint8_t command)
-{
-    uint8_t tx_buff[64];
-    const uint16_t len = construct_msp_command_v1(tx_buff, command, NULL, 0, MSP_OUTBOUND);
     msp_tx_send_owner(owner, tx_buff, len);
 }
 

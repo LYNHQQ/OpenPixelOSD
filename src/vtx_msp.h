@@ -35,6 +35,5 @@ void vtx_msp_push_power_table(uint8_t owner);
 void vtx_msp_push_band_table(uint8_t owner);
 void vtx_msp_push_calibration_table(uint8_t owner);
 void vtx_msp_eeprom_write(uint8_t owner);
-void vtx_msp_send_command(uint8_t owner, uint8_t command);
 
 #endif //VTX_MSP_H

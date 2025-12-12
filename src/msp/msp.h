@@ -118,6 +118,8 @@ uint16_t construct_msp_command_v1(uint8_t message_buffer[], uint8_t command, con
 uint16_t construct_msp_command_v2(uint8_t message_buffer[], uint16_t function, const uint8_t *payload, uint8_t size, msp_packet_type_t msp_packet_type);
 
 void msp_init(void);
+void msp_tx_send_owner(uint8_t owner, const uint8_t *buf, uint16_t len);
+void msp_send_command(uint8_t owner, uint8_t command);
 void msp_loop_process(void);
 
 #endif //MSP_H

@@ -15,8 +15,9 @@
 
 #if defined(BUILD_VARIANT_VTX)
 #include "vtx_msp.h"
-#define MSP_REQUEST_LOOP_INTERVAL 100u
 #endif
+
+#define MSP_REQUEST_LOOP_INTERVAL 100u
 
 CCMRAM_BSS static msp_port_t msp_uart = {0};
 CCMRAM_BSS static msp_port_t msp_usb = {0};
@@ -32,8 +33,8 @@ void msp_init(void)
 
     msp_usb.callback = msp_callback;
     msp_usb.owner = MSP_OWNER_USB;
-
-    vtx_msp_send_command(MSP_OWNER_UART, MSP_BOXIDS);
+    
+    msp_send_command(MSP_OWNER_UART, MSP_BOXIDS);
 }
 
 EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
@@ -343,6 +344,23 @@ uint16_t construct_msp_command_v2(uint8_t message_buffer[], uint16_t function, c
     return len;
 }
 
+/* Small sender wrapper */
+void msp_tx_send_owner(uint8_t owner, const uint8_t *buf, uint16_t len)
+{
+    if (owner == MSP_OWNER_USB) {
+        usb_uart_write_bytes((const char*)buf, len);
+    } else if (owner == MSP_OWNER_UART) {
+        uart1_tx_dma((uint8_t*)buf, len);
+    }
+}
+
+void msp_send_command(uint8_t owner, uint8_t command)
+{
+    uint8_t tx_buff[64];
+    const uint16_t len = construct_msp_command_v1(tx_buff, command, NULL, 0, MSP_OUTBOUND);
+    msp_tx_send_owner(owner, tx_buff, len);
+}
+
 EXEC_RAM void msp_loop_process(void)
 {
     uint8_t byte;
@@ -353,7 +371,6 @@ EXEC_RAM void msp_loop_process(void)
         msp_process_received_data(&msp_usb, byte);
     }
 
-#if defined(BUILD_VARIANT_VTX)
     static uint32_t last_tick = 0;
     static uint8_t configRequest = 2;
     static uint8_t c = 0;
@@ -362,14 +379,15 @@ EXEC_RAM void msp_loop_process(void)
         switch(c) {
           case 0:
           case 2:
-            vtx_msp_send_command(MSP_OWNER_UART, MSP_RC);
+            msp_send_command(MSP_OWNER_UART, MSP_RC);
             c++;
             break;
           case 1:
-            vtx_msp_send_command(MSP_OWNER_UART, MSP_STATUS);
+            msp_send_command(MSP_OWNER_UART, MSP_STATUS);
             c = c + (!fc.status.armed);
             break;
           case 3:
+#if defined(BUILD_VARIANT_VTX)
             if (!vtx_get_config()->configSet) {
               if(configRequest) {
                 vtx_msp_request_config(MSP_OWNER_UART);
@@ -379,11 +397,14 @@ EXEC_RAM void msp_loop_process(void)
                 vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
                 vtx_config->configSet = 1;
               }
-            } 
+            }
+#else
+            UNUSED(configRequest);
+#endif 
             c = 0;
             break;
         }
         
     }
-#endif
+
 }

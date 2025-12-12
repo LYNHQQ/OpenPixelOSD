@@ -127,7 +127,6 @@ if(BUILD_VARIANT STREQUAL "VTX")
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/settings.c
             ./src/settingsMenu.c)
 endif()
 
@@ -172,6 +171,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/fonts/update_font.c
         ./src/video_graphics.c
         ./src/main.c
+        ./src/settings.c
 
 )
 

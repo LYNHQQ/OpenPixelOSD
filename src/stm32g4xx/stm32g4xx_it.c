@@ -61,6 +61,10 @@ void HardFault_Handler_C(uint32_t *stacked_regs) {
     //volatile uint32_t mmfar = SCB->MMFAR;
     //volatile uint32_t bfar  = SCB->BFAR;
 
+    UNUSED(lr);
+    UNUSED(pc);
+    UNUSED(cfsr);
+
     TRACE_FATAL("HardFault!\nPC = 0x%08lX\nLR = 0x%08lX\nCFSR = 0x%08lX\n", pc, lr, cfsr);
 
     while (1); 

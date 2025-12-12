@@ -82,7 +82,9 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
         TRACE_INFO("target_debug %04x %04x\n", debug0, debug1);
         switch (debug1) {
         case 0:
+#if defined(BUILD_VARIANT_VTX)
             rf_pa_set_vref_mv(debug0);
+#endif
             break;
         case 1:
             break;

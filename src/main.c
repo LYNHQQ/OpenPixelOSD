@@ -43,7 +43,7 @@ void debug_print_loop(void)
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
-        uint16_t rf_detect_int = rf_detector;
+        TRACE_CMD(uint16_t rf_detect_int = rf_detector);
         TRACE_INFO("sync V:%i bl: %i sync low:%i adc_PA:%i adc_5V:%i\n",
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 

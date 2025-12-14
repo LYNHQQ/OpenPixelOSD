@@ -123,6 +123,17 @@ if(BUILD_VARIANT STREQUAL "VTX")
     message(STATUS "Building with VTX support")
     set(BUILD_NAME "_VTX")
     add_compile_definitions(BUILD_VARIANT_VTX)
+    add_compile_definitions(TARGET_GENERIC)
+    set(VTX_SRC
+            ./src/rtc6705.c
+            ./src/rf_pa.c
+            ./src/vtx_msp.c
+            ./src/settingsMenu.c)
+elseif(BUILD_VARIANT STREQUAL "PIXELVTX")
+    message(STATUS "Building pixelVTX")
+    set(BUILD_NAME "_pixelVTX")
+    add_compile_definitions(BUILD_VARIANT_VTX)
+    add_compile_definitions(TARGET_PIXELVTX)
     set(VTX_SRC
             ./src/rtc6705.c
             ./src/rf_pa.c

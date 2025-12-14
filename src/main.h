@@ -69,8 +69,8 @@ typedef enum {
  * R3: reserved
  */
 typedef enum {
-  ADC_CH_PA_VDET = 0,
-  ADC_CH_VCC5 = 1,
+  ADC_CH_RESERVED = 0,
+  ADC_CH_PA_VDET = 1,
   ADC_CH_TEMP = 2,
   ADC_CH_VREF_INT  = 3, // internal VREFINT
   ADC_CH_COUNT
@@ -85,28 +85,6 @@ typedef enum {
 
 #define OPAMP1_VINPIO2_VIDEO1_IN_Pin            LL_GPIO_PIN_7
 #define OPAMP1_VINPIO2_VIDEO1_IN_GPIO_Port      GPIOA
-
-#define SPI2_CS_Pin                             LL_GPIO_PIN_7
-#define SPI2_CS_GPIO_Port                       GPIOB
-#define SPI2_SCK_Pin                            LL_GPIO_PIN_6
-#define SPI2_SCK_GPIO_Port                      GPIOB
-#define SPI2_MOSI_Pin                           LL_GPIO_PIN_9
-#define SPI2_MOSI_GPIO_Port                     GPIOB
-
-#define USER_KEY_Pin                            LL_GPIO_PIN_15
-#define USER_KEY_GPIO_Port                      GPIOC
-#define LED_STATE_Pin                           LL_GPIO_PIN_13
-#define LED_STATE_GPIO_Port                     GPIOC
-#define LED2_Pin                                LL_GPIO_PIN_14
-#define LED2_GPIO_Port                          GPIOC
-#define BOOT_KEY_Pin                            LL_GPIO_PIN_8
-#define BOOT_KEY_GPIO_Port                      GPIOB
-
-//Test point
-#define TP1_Pin                                 LL_GPIO_PIN_6
-#define TP1_GPIO_Port                           GPIOA
-#define TP2_Pin                                 LL_GPIO_PIN_1
-#define TP2_GPIO_Port                           GPIOB
 
 
 #define EXEC_RAM      __attribute__((section (".ccmram.text"), optimize("Ofast"))) /* exec functions from CCMRAM */
@@ -126,12 +104,15 @@ typedef enum {
 
 #define SYNC_LOST_FRAMES_THRESHOLD              20
 
-//Set input gain and total gain to 2 if FMS6141 video filter is used
-#define VIDEO1_INPUT_GAIN                       2
-#define VIDEO2_INPUT_GAIN                       1
-#define VIDEO_TOTAL_GAIN                        2
-
 #define BOXID_CAM_SWITCH                        MSP_BOXID_CAMERA_CONTROL_1
+
+
+#if defined(TARGET_PIXELVTX)
+#include "targets\pixelVTX.h"
+#else
+#include "targets\generic.h"
+#endif
+
 
 void gpio_init(void);
 void adc_init(void);

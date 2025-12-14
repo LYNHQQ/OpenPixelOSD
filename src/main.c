@@ -49,7 +49,7 @@ void debug_print_loop(void)
           (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
           sync_voltage_low,
           rf_detect_int,
-          adc_read_mv(1) * 2); // Loop debug printf here
+          adc_read_mv(ADC_CH_RESERVED) * 2); // Loop debug printf here
     }
 }
 
@@ -117,9 +117,7 @@ void led_blink(void)
     static uint32_t last_tick = 0;
 
     if ((HAL_GetTick() - last_tick) >= LED_BLINK_INTERVAL) {
-      #ifndef TRIGGER_LINE  
       LED_STATE_GPIO_Port->ODR ^= LED_STATE_Pin;
-      #endif  
       last_tick = HAL_GetTick();
     }
 }

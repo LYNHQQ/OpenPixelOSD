@@ -442,7 +442,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         video_line++;
         #ifdef TRIGGER_LINE
         if (video_line == TRIGGER_LINE) {
-          LL_GPIO_SetOutputPin(LED_STATE_GPIO_Port, LED_STATE_Pin);
+          LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
         }
         #endif
         if (video_line <= MAX_RENDER_LINE) {
@@ -469,7 +469,9 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
     } else if (time_ns > 56.0f && time_ns < 58.0f) {
         if (vsync >= 4) {
           vsync = 4;
+          #if defined(TP1_Pin)
           LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
+          #endif
           LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(LOW_SYNC_ADC_DELAY_NS));
         }
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
@@ -487,7 +489,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         // Do nothing, wait for next sync
     }
     #ifdef TRIGGER_LINE
-      LL_GPIO_ResetOutputPin(LED_STATE_GPIO_Port, LED_STATE_Pin);
+      LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
     #endif
 }
 

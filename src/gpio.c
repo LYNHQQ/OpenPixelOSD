@@ -20,8 +20,6 @@ void gpio_init(void)
     /**/
     LL_GPIO_ResetOutputPin(LED_STATE_GPIO_Port, LED_STATE_Pin);
 
-    LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
-
     /**/
     GPIO_InitStruct.Pin = USER_KEY_Pin;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
@@ -58,13 +56,35 @@ void gpio_init(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(LED_STATE_GPIO_Port, &GPIO_InitStruct);
 
+#if defined(LED2_Pin)
+    LL_GPIO_ResetOutputPin(LED2_GPIO_Port, LED2_Pin);
+    GPIO_InitStruct.Pin = LED2_Pin;
+    GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
+    GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+    LL_GPIO_Init(LED2_GPIO_Port, &GPIO_InitStruct);
+#endif
+
+#if defined(TP1_Pin)
+    LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
     GPIO_InitStruct.Pin = TP1_Pin;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
     GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(TP1_GPIO_Port, &GPIO_InitStruct);
+#endif
 
+#if defined(TP2_Pin)
+    LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
+    GPIO_InitStruct.Pin = TP2_Pin;
+    GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
+    GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+    GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+    LL_GPIO_Init(TP2_GPIO_Port, &GPIO_InitStruct);
+#endif
     /**/
     GPIO_InitStruct.Pin = BOOT_KEY_Pin;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;

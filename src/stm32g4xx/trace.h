@@ -187,7 +187,7 @@ extern int printf(const char* format, ...);
 #if (TRACE_LEVEL >= TRACE_LEVEL_FATAL)
 #define TRACE_FATAL(...)      {printf("-F- " __VA_ARGS__); while(1); }
 #define TRACE_FATAL_WP(...)   {printf(__VA_ARGS__); while(1); }
-#define TRACE_CMD(...)        {__VA_ARGS__}
+#define TRACE_CMD(arg)        arg
 #else
 #define TRACE_FATAL(...)      { while(1); }
 #define TRACE_FATAL_WP(...)   { while(1); }

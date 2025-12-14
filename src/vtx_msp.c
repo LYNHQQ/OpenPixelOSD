@@ -490,7 +490,6 @@ void vtx_msp_set_calibration(uint8_t owner, const uint8_t *payload, uint16_t dat
     
     if (pa_mv) {
       rf_pa_set_calibration(pa_mv);
-      LED_STATE_GPIO_Port->ODR ^= LED_STATE_Pin;
       if(!counter--) {
         TRACE_INFO("Calibration mv %i\n", pa_mv);
         counter = 49;

@@ -60,6 +60,7 @@ uint16_t sync_voltage = SYNC_START_MV;
 uint16_t sync_voltage_black = SYNC_START_MV;
 uint16_t sync_voltage_low = 0;
 osdState_e osdState = OSD_INIT;
+static uint8_t sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
 
 videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
                                 {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
@@ -129,10 +130,8 @@ void set_video_input(uint8_t input)
   else
     activeVideoInput = 0;
 
-  if(video_source == videoInputs[1 - activeVideoInput].opampInput) {
-    set_video_source(videoInputs[activeVideoInput].opampInput);
-    syncState = SYNC_STATE_SEARCH;
-  }
+  set_video_source(videoInputs[activeVideoInput].opampInput);
+  sync_lost = 1;
 
   LL_COMP_SetInputPlus(COMP2, videoInputs[activeVideoInput].compInput);
 }
@@ -197,8 +196,11 @@ void video_overlay_init(void)
     video_gen_enabled = true;
     video_gen_stop();
     set_video_input(settings.activeVideoInput);
-    if (settings.displayportEnabled) {
-      set_video_source(videoInputs[activeVideoInput].opampInput);
+    set_video_source(OPAMP_CONST_DAC);
+    set_black_level(DAC_BLACK);
+    video_gen_start();
+
+    if (settings.displayportEnabled) {     
       setSyncMode(AUTOMATIC);
       osdState = OSD_MSP;
     } else {
@@ -573,7 +575,6 @@ EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
 
 void video_sync_loop(void) {
   static uint32_t last_tick = 0;
-  static uint8_t sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
   static uint8_t last_frame;
 
   if (syncMode <= INTERNAL) {

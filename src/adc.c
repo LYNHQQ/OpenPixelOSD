@@ -105,6 +105,9 @@ void adc_init(void)
 
     LL_ADC_REG_SetSequencerLength(ADC1, LL_ADC_REG_SEQ_SCAN_ENABLE_4RANKS);
 
+    // sync with `adc_ch_t` in `main.h`, RANK determines order in ADC DMA buffer and `adc_ch_t` is used to index into the buffer.
+    // see also: `adc_read_raw()`
+
     /** Configure Regular Channel */
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_1, ADC_RESERVED_Channel);
     LL_ADC_SetChannelSamplingTime(ADC1, ADC_RESERVED_Channel, LL_ADC_SAMPLINGTIME_92CYCLES_5);

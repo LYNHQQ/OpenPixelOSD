@@ -63,15 +63,11 @@ typedef enum {
   PX_GRAY
 } px_t;
 
-/* --------- Logical channel order in the regular sequence ---------
- * R1: PA-VDET (PB14/IN14)
- * R2: TempSensor (internal)
- * R3: reserved
- */
+// see adc.c - adc_init()
 typedef enum {
-  ADC_CH_RESERVED = 0,
-  ADC_CH_PA_VDET = 1,
-  ADC_CH_TEMP = 2,
+  ADC_CH_RESERVED = 0, // reserved
+  ADC_CH_PA_VDET = 1, // rf pa vdet signal
+  ADC_CH_TEMP = 2, // internal temperature sensor
   ADC_CH_VREF_INT  = 3, // internal VREFINT
   ADC_CH_COUNT
 } adc_ch_t;
@@ -85,6 +81,24 @@ typedef enum {
 
 #define OPAMP1_VINPIO2_VIDEO1_IN_Pin            LL_GPIO_PIN_7
 #define OPAMP1_VINPIO2_VIDEO1_IN_GPIO_Port      GPIOA
+
+//
+// Reserved pins for future features
+//
+
+// If RGB LED support is added, then TIM8 has required features for driving by DMA.
+#define RGBLED_TIM8_CH1_Pin                     LL_GPIO_PIN_15
+#define RGBLED_TIM8_CH1_GPIO_Port               GPIOA
+
+// If FRSKY PixelOSD protocol is added, a second UART can be used.
+#define FRSKY_PIXEL_OSD_TX_USART3_TX_Pin        LL_GPIO_PIN_10
+#define FRSKY_PIXEL_OSD_TX_USART3_TX_GPIO_Port  GPIOC
+#define FRSKY_PIXEL_OSD_RX_USART3_RX_Pin        LL_GPIO_PIN_11
+#define FRSKY_PIXEL_OSD_RX_USART3_RX_GPIO_Port  GPIOC
+
+// If RF PA VBIAS is expanded, then DAC1_OUT1 can be used to control the VBIAS voltage.
+#define RF_VBIAS_DAC1_OUT2_Pin                  LL_GPIO_PIN_5
+#define RF_VBIAS_DAC1_OUT2_GPIO_Port            GPIOA
 
 
 #define EXEC_RAM      __attribute__((section (".ccmram.text"), optimize("Ofast"))) /* exec functions from CCMRAM */
@@ -138,5 +152,9 @@ void TIM17_Init(void);
 
 void COMP2_Init(void);
 void COMP3_Init(void);
+
+/* Canvas character functions */
+EXEC_RAM void canvas_char_clean(void);
+EXEC_RAM void canvas_char_draw_complete(void);
 
 #endif /* __MAIN_H */

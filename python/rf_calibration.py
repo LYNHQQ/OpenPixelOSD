@@ -109,6 +109,17 @@ async def scanPa(power):
     await asyncio.sleep(0.5)
 
     while True:
+      for r in range(4):
+        msp.send_MSP_SET_PACALIBRATION(paval)
+        await asyncio.sleep(0.1)
+        sys.stdout.write(f"\rFrq: {msp.frequency} MHz  PA: {paval} mV  Pwr: {meter.avg_power:03.3f} mW  Det: {msp.detector}    ")
+      
+      if (msp.pa_table[power].mW * 0.80 < meter.avg_power):
+        break
+      
+      paval +=50
+    
+    while True:
       msp.send_MSP_SET_PACALIBRATION(paval)
       await asyncio.sleep(0.21)
       sys.stdout.write(f"\rFrq: {msp.frequency} MHz  PA: {paval} mV  Pwr: {meter.avg_power:03.3f} mW  Det: {msp.detector}    ")
@@ -266,7 +277,7 @@ async def menue():
         try:
           filename = input("\nEnter filename: ")
           filename = "pa_table.json" if filename == "" else filename
-          msp.pa_table.load_json(filename)
+          msp.pa_table = msp.pa_table.load_json(filename)
           print(f"\nFile {filename} loaded")
         except:
           print("\nFile error")

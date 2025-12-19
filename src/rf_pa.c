@@ -12,15 +12,15 @@
 
 
 powerTable_t powerTable[] = { {0,  {' ', ' ', '0'}, RTC6705_PA_3dBm,  { 5650, 5700, 5750, 5800, 5850, 5900, 5950 },     //cal frequency
-                                                                      { 0,    0,    0,    0,    0,    0,    0    }},
-                              {1,  {' ', ' ', '1'}, RTC6705_PA_3dBm,  { 1931, 1951, 1972, 1995, 2019, 2043, 2071 },
-                                                                      { 172,  142,  115,  109,  112,  110,  117  }},
-                              {10, {' ', '1', '0'}, RTC6705_PA_7dBm,  { 1976, 1997, 2018, 2040, 2064, 2090, 2121 }, 
-                                                                      { 1174, 1026, 856,  783,  767,  771,  824  }}, 
-                              {25, {' ', '2', '5'}, RTC6705_PA_7dBm,  { 2016, 2033, 2054, 2075, 2100, 2128, 2163 }, 
-                                                                      { 2306, 1954, 1708, 1542, 1500, 1512, 1612 }}, 
-                              {50, {' ', '5', '0'}, RTC6705_PA_11dBm, { 2050, 2064, 2083, 2103, 2129, 2159, 2198 }, 
-                                                                      { 3274, 3206, 2804, 2514, 2432, 2469, 2595 }},
+                                                                      {    0,    0,    0,    0,    0,    0,    0 }},
+                              {1,  {' ', ' ', '1'}, RTC6705_PA_3dBm,  {    1,    1,    1,    1,    1,    1,    1 },
+                                                                      {    0,    0,    0,    0,    0,    0,    0 }},
+                              {10, {' ', '1', '0'}, RTC6705_PA_7dBm,  {    1,    1,    1,    1,    1,    1,    1 }, 
+                                                                      {    0,    0,    0,    0,    0,    0,    0 }}, 
+                              {25, {' ', '2', '5'}, RTC6705_PA_7dBm,  {    1,    1,    1,    1,    1,    1,    1 }, 
+                                                                      {    0,    0,    0,    0,    0,    0,    0 }}, 
+                              {50, {' ', '5', '0'}, RTC6705_PA_11dBm, {    1,    1,    1,    1,    1,    1,    1 }, 
+                                                                      {    0,    0,    0,    0,    0,    0,    0 }},
                             };
 
 #define NUM_PWR             (sizeof(powerTable)/sizeof(powerTable[0]) - 1)
@@ -52,7 +52,18 @@ static inline void dac_ch2_write_mv(uint16_t mv)
 
 void rf_pa_enable(bool on)
 {
-    dac_ch2_write_mv(on ? g_vref_mv : 0u);
+    if(on) {
+      dac_ch2_write_mv(g_vref_mv);
+      #ifdef PA_ON_GPIO_Port
+      LL_GPIO_SetOutputPin(PA_ON_GPIO_Port, PA_ON_Pin);
+      #endif
+    } else {
+      #ifdef PA_ON_GPIO_Port
+      LL_GPIO_ResetOutputPin(PA_ON_GPIO_Port, PA_ON_Pin);
+      #endif
+      dac_ch2_write_mv(0u);
+    }
+    
 }
 
 void rf_pa_set_vref_mv(uint16_t mv)

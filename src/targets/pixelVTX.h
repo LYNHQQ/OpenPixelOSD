@@ -8,9 +8,9 @@
 #define SPI2_MOSI_Pin                           LL_GPIO_PIN_9
 #define SPI2_MOSI_GPIO_Port                     GPIOB
 
-#define ADC_RESERVED_Pin                        LL_GPIO_PIN_12
+#define ADC_RESERVED_Pin                        LL_GPIO_PIN_14
 #define ADC_RESERVED_GPIO_Port                  GPIOB
-#define ADC_RESERVED_Channel                    LL_ADC_CHANNEL_11
+#define ADC_RESERVED_Channel                    LL_ADC_CHANNEL_5
 
 #define ADC_PA_VDET_Pin                         LL_GPIO_PIN_0
 #define ADC_PA_VDET_GPIO_Port                   GPIOB

@@ -51,6 +51,11 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
     case MSP_SET_VTX_CONFIG:
     case MSP_VTXTABLE_BAND:
     case MSP_VTXTABLE_POWERLEVEL:
+    case MSP_PACALTABLE:
+    case MSP_SET_PACALTABLE:
+    case MSP_PACALIBRATION:
+    case MSP_SET_PACALIBRATION:
+    case MSP_EEPROM_WRITE:
 #if defined(BUILD_VARIANT_VTX)
         vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
 #endif

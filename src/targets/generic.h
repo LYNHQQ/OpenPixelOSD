@@ -26,7 +26,13 @@
 #define BOOT_KEY_GPIO_Port                      GPIOB
 
 //Set input gain and total gain to 2 if FMS6141 video filter is used
-#define VIDEO1_INPUT_GAIN                       1
-#define VIDEO2_INPUT_GAIN                       1
 #define VIDEO_TOTAL_GAIN                        1
+
+// Video input 1 PA3
+#define VIDEO1_INPUT_ENABLED                    false
+#define VIDEO1_INPUT_GAIN                       1
+
+// Video input 2 PA7
+#define VIDEO2_INPUT_ENABLED                    true
+#define VIDEO2_INPUT_GAIN                       1
 

@@ -35,7 +35,9 @@ osdEntry_t osdMenue[] = { {"BAND",        (osdPrintFuncPtr)printMenuValue,    (o
                           {"POWER",       (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePower},
                           {"PIT MODE",    (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePit},
                           {"DISPLAYPORT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeDisplayport},
+                          #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
                           {"VIDEO INPUT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeVideoIn},
+                          #endif
                           {"EXIT",        NULL,                               (osdKeyFuncPtr)exitVtxMenu},
                           {"SAVE+EXIT",   NULL,                               (osdKeyFuncPtr)exitVtxMenu}};
 

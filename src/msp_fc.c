@@ -50,14 +50,18 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
         if (boxIdIdx) {
           if(!fc.status.cameraControl && (status & 1<<boxIdIdx)) {
             fc.status.cameraControl = 1;
+            #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
             TRACE_INFO("CAM SWITCH on\n");
             if (settings.camswitchEnabled)
               set_video_input(1);
+            #endif
           } else if (fc.status.cameraControl && !(status & 1<<boxIdIdx)) {
             fc.status.cameraControl = 0;
+            #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
             TRACE_INFO("CAM SWITCH off\n");
             if (settings.camswitchEnabled)
               set_video_input(0);
+            #endif
           }
         }
         break;

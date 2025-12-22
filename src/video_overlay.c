@@ -195,7 +195,13 @@ void video_overlay_init(void)
     show_version();
     video_gen_enabled = true;
     video_gen_stop();
+#if(VIDEO1_INPUT_ENABLED == false)
+    set_video_input(1);
+#elif(VIDEO2_INPUT_ENABLED == false)
+    set_video_input(0);
+#else
     set_video_input(settings.activeVideoInput);
+#endif
     set_video_source(OPAMP_CONST_DAC);
     set_black_level(DAC_BLACK);
     video_gen_start();

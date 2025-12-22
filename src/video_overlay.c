@@ -55,6 +55,7 @@ uint32_t* opa_vals = &opa_val[0];
 
 uint8_t frame_counter = 0;
 syncMode_t syncMode = OFF;
+videoMode_t videoMode = MODE_UNKNOWN;
 syncState_t syncState = SYNC_STATE_SEARCH;
 uint16_t sync_voltage = SYNC_START_MV;
 uint16_t sync_voltage_black = SYNC_START_MV;
@@ -483,7 +484,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(LOW_SYNC_ADC_DELAY_NS));
         }
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
-        if (vsync == 8) {
+        if ((videoMode = MODE_PAL && vsync == 8) || (videoMode = MODE_NTSC && vsync == 9)) {
           
           if (new_field == true) {
             new_field = false;
@@ -513,19 +514,22 @@ EXEC_RAM static inline void check_resync(uint32_t tim_tick)
           vsync = 4;
         }
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
-        if (vsync != 8) {
+        if (vsync == 8) {
+          videoMode = MODE_PAL;
+        } else if (vsync == 9) {
+          videoMode = MODE_NTSC;
+        }else {
           vsync = 0;
         }
-    } else if (time_ns > 65.5f && time_ns < 67.5f) {
-        if (vsync == 12) {
+
+    } else if ((time_ns > 33.5f && time_ns < 35.5f) || (time_ns > 65.5f && time_ns < 67.5f)) {
+        if (videoMode == MODE_PAL && vsync == 12) {
+          syncState = SYNC_STATE_FOUND;
+        } else if (videoMode == MODE_NTSC && vsync == 14) {
           syncState = SYNC_STATE_FOUND;
         }
         vsync = 0;
-    } else if (time_ns > 33.5f && time_ns < 35.5f) {
-        if (vsync == 12) {
-          syncState = SYNC_STATE_FOUND;
-        }
-        vsync = 0;
+
     } else {
         vsync = 0;
     }

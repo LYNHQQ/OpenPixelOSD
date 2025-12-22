@@ -26,6 +26,12 @@ typedef enum {
   OSD_EXIT_MENU
 } osdState_e;
 
+typedef enum {
+    MODE_UNKNOWN,
+    MODE_PAL,
+    MODE_NTSC
+} videoMode_t;
+
 typedef struct {
     uint32_t  compInput;
     uint32_t  opampInput;

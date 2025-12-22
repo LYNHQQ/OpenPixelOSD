@@ -241,7 +241,7 @@ class MSP:
           self.detector = (self.payload[4] << 8) | self.payload[3]
           self.mvPa = (self.payload[2] << 8) | self.payload[1]
         case _:
-          print(f"Unknown MSPv{self.msp_version} function={function}, size={payload_size}")
+          #print(f"Unknown MSPv{self.msp_version} function={function}, size={payload_size}")
           pass
 
 

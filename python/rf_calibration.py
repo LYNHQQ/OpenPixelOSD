@@ -29,6 +29,9 @@ else:
     finally:
       termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
+def map(x, in_min, in_max, out_min, out_max):
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
 
 async def testPa(power):
   global meter
@@ -133,9 +136,8 @@ async def scanPa(power):
         await asyncio.sleep(0.1)
         sys.stdout.write(f"\rFrq: {msp.frequency} MHz  PA: {paval} mV  Pwr: {meter.avg_power:03.3f} mW  Det: {msp.detector}    ")
       
-      if (msp.pa_table[power].mW < meter.avg_power):
+      if meter.avg_power > msp.pa_table[power].mW:
         break
-      
       paval +=1
 
     for r in range(25):
@@ -172,20 +174,41 @@ async def scanDetector(power):
         break
       paval -=1
 
-    scans = 0
-    while scans < 10:
-      for r in range(10):
+    avg_pwr = [0] * 3
+    avg_det = [0] * 3
+    while True:
+      avg_pwr[0] = 0
+      avg_det[0] = 0
+      for r in range(20):
         msp.send_MSP_SET_PACALIBRATION(paval)
         await asyncio.sleep(0.1)
-        sys.stdout.write(f"\rFrq: {msp.frequency} MHz  PA: {paval} mV  Pwr: {meter.avg_power:03.3f} mW  Det: {msp.detector}    ")
-      
-      if ((msp.pa_table[power].mW * 0.99) > meter.avg_power):
+        sys.stdout.write(f"\rFrq: {msp.frequency} MHz  PA: {paval} mV  Pwr: {meter.power:03.3f} mW  Det: {msp.detector}    ")
+        if r > 9:
+          avg_pwr[0] += meter.avg_power * 0.1
+          avg_det[0] += msp.detector * 0.1
+
+      dev = max(0.1, msp.pa_table[power].mW * 0.1)
+      if (avg_pwr[0] < (msp.pa_table[power].mW - dev)):
+        paval +=2
+      elif (avg_pwr[0] > (msp.pa_table[power].mW + dev)):
+        paval -=2
+      elif (avg_pwr[0] < (msp.pa_table[power].mW)):
+        avg_pwr[1] = avg_pwr[0]
+        avg_det[1] = avg_det[0]
         paval +=1
       else:
-        scans +=1
-
-    msp.pa_table[power].detector[i] = msp.detector
+        avg_pwr[2] = avg_pwr[0]
+        avg_det[2] = avg_det[0]
+        paval -=1
+      
+      if(avg_pwr[1] > 0 and avg_pwr[2] > 0):
+        break
+    
+    detector = int(map(msp.pa_table[power].mW, avg_pwr[1], avg_pwr[2], avg_det[1], avg_det[2]))
     sys.stdout.write("\n")
+    #sys.stdout.write(f"\rFrq: {msp.frequency} MHz  PA: {paval} mV  Pwr: {meter.avg_power:03.3f} mW  Det: {int(detector)}    \n")
+    msp.pa_table[power].detector[i] = int(detector)
+    sys.stdout.write(f"Pwr: {avg_pwr[1]:03.3f}/{avg_pwr[2]:03.3f} Detector: {int(avg_det[1])}/{int(avg_det[2])}  Det: {int(detector)}    \n")
     
     msp.send_MSP_SET_PACALIBRATION(1)
 

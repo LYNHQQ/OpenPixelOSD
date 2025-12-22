@@ -17,44 +17,9 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ---- VTX bands table: letter + 8-char name + 8 channel freqs (MHz) ---- */
-#define VTX_CHANNEL_COUNT    8
-#define VTX_CH_LABEL_COUNT   8
-#define VTX_IS_FACTORY_BAND  1
-
 static void vtx_apply_hw(const vtx_config_t *cfg);
 
-typedef struct {
-    char letter;                            /* 'A','B','E','F','R' */
-    uint8_t band_name[VTX_CH_LABEL_COUNT];  /* shown in BF “Name”, exactly 8 bytes */
-    uint16_t freq[VTX_CHANNEL_COUNT];       /* ch1..ch8, MHz */
-} vtx_band_t;
-
-/* VTX bands table (letter + 8-char name + 8 channel freqs (MHz)).
- * These are standard bands used in Betaflight and iNav.
- * You can add custom bands here if needed. */
-static const vtx_band_t g_bands[] = {
-    /* Band A (Boscam A) */
-    { 'A', { 'B','O','S','C','A','M',' ','A' },
-      { 5865,5845,5825,5805,5785,5765,5745,5725 } },
-
-    /* Band B (Boscam B) */
-    { 'B', { 'B','O','S','C','A','M',' ','B' },
-      { 5733,5752,5771,5790,5809,5828,5847,5866 } },
-
-    /* Band E */
-    { 'E', { 'B','A','N','D',' ','E',' ',' ' },
-      { 5705,5685,5665,5645,5885,5905,5925,5945 } },
-
-    /* Band F (FatShark) */
-    { 'F', { 'F','A','T','S','H','A','R','K' },
-      { 5740,5760,5780,5800,5820,5840,5860,5880 } },
-
-    /* Band R (Raceband) */
-    { 'R', { 'R','A','C','E','B','A','N','D' },
-      { 5658,5695,5732,5769,5806,5843,5880,5917 } },
-};
-#define NUM_BANDS (sizeof(g_bands)/sizeof(g_bands[0]))
+extern const vtx_band_t g_bands[];
 
 static vtx_config_t g_cfg = {
     .band = 5,
@@ -98,11 +63,6 @@ const vtx_config_t* vtx_get_config(void)
 const char* vtx_get_band_name(uint8_t band)
 {
     return (char*)&g_bands[band].band_name;
-}
-
-uint8_t vtx_get_band_count(void)
-{
-    return NUM_BANDS;
 }
 
 uint16_t vtx_get_power_mw(void)
@@ -249,7 +209,7 @@ static void handle_msp_set_vtx_config(uint8_t owner, const uint8_t *payload, uin
       g_cfg.frequency = freq_mhz;
     }
     
-    if(vtx_table_bands != NUM_BANDS || vtx_table_power_levels != rf_pa_power_count()) {
+    if(vtx_table_bands != vtx_get_band_count() || vtx_table_power_levels != rf_pa_power_count()) {
       g_cfg.vtx_table_available = 0;
     } else {
       g_cfg.vtx_table_available = vtx_table_available;
@@ -301,10 +261,10 @@ void vtx_msp_clear_table_and_set_defaults(uint8_t owner)
     p[3]  = 0;                          /* pitmode (0/1) */
     p[4]  = 0;                          /* lowPowerDisarm */
     p[5]  = 0; p[6]  = 0;               /* pitModeFreq (LSB/MSB), 0 if unused */
-    p[7]  = (uint8_t)(NUM_BANDS);       /* newBand (1..NUM_BANDS) */
+    p[7]  = vtx_get_band_count();       /* newBand (1..NUM_BANDS) */
     p[8]  = VTX_CHANNEL_COUNT;          /* newChannel (1..8) */
     p[9]  = 0; p[10] = 0;               /* newFreq LSB/MSB, 0 => use band/channel */
-    p[11] = (uint8_t)(NUM_BANDS);       /* newBandCount: BF expects "6"*/
+    p[11] = vtx_get_band_count();       /* newBandCount: BF expects "6"*/
     p[12] = VTX_CHANNEL_COUNT;          /* newChannelCount (8) */
     p[13] = rf_pa_power_count();        /* newPowerCount: */
     p[14] = 1;                          /* vtx table should be cleared */
@@ -353,7 +313,7 @@ void vtx_msp_push_power_table(uint8_t owner)
 
 void vtx_msp_push_band_table(uint8_t owner)
 {
-    for (uint8_t b = 1; b <= NUM_BANDS; b++) {
+    for (uint8_t b = 1; b <= vtx_get_band_count(); b++) {
         const vtx_band_t *band = &g_bands[b-1];
 
         /* Payload layout (29 bytes):

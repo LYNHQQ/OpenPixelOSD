@@ -18,6 +18,17 @@ typedef struct {
   uint8_t configSet;
 } vtx_config_t;
 
+/* ---- VTX bands table: letter + 8-char name + 8 channel freqs (MHz) ---- */
+#define VTX_CHANNEL_COUNT    8
+#define VTX_CH_LABEL_COUNT   8
+#define VTX_IS_FACTORY_BAND  1
+
+typedef struct {
+    char letter;                            /* 'A','B','E','F','R' */
+    uint8_t band_name[VTX_CH_LABEL_COUNT];  /* shown in BF “Name”, exactly 8 bytes */
+    uint16_t freq[VTX_CHANNEL_COUNT];       /* ch1..ch8, MHz */
+} vtx_band_t;
+
 const vtx_config_t* vtx_get_config(void);
 const char* vtx_get_band_name(uint8_t band);
 uint8_t vtx_get_band_count(void);

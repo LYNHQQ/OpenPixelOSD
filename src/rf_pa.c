@@ -10,30 +10,9 @@
 #include "vtx_msp.h"
 #include "flash.h"
 
-
-powerTable_t powerTable[] = { {0,  {' ', ' ', '0'}, RTC6705_PA_3dBm,  { 5650, 5700, 5750, 5800, 5850, 5900, 5950 },     //cal frequency
-                                                                      {    0,    0,    0,    0,    0,    0,    0 }},
-                              {1,  {' ', ' ', '1'}, RTC6705_PA_3dBm,  {    1,    1,    1,    1,    1,    1,    1 },
-                                                                      {    0,    0,    0,    0,    0,    0,    0 }},
-                              {10, {' ', '1', '0'}, RTC6705_PA_7dBm,  {    1,    1,    1,    1,    1,    1,    1 }, 
-                                                                      {    0,    0,    0,    0,    0,    0,    0 }}, 
-                              {25, {' ', '2', '5'}, RTC6705_PA_7dBm,  {    1,    1,    1,    1,    1,    1,    1 }, 
-                                                                      {    0,    0,    0,    0,    0,    0,    0 }}, 
-                              {50, {' ', '5', '0'}, RTC6705_PA_11dBm, {    1,    1,    1,    1,    1,    1,    1 }, 
-                                                                      {    0,    0,    0,    0,    0,    0,    0 }},
-                            };
-
-#define NUM_PWR             (sizeof(powerTable)/sizeof(powerTable[0]) - 1)
-
-
 static uint16_t g_vref_mv = 0;
 float rf_detector_target = 0;
 double rf_detector = 0;
- 
-uint8_t rf_pa_power_count(void)
-{
-    return NUM_PWR;
-}
 
 static inline void dac_ch2_write_mv(uint16_t mv)
 {
@@ -141,7 +120,7 @@ uint16_t rf_pa_set_power_level(uint8_t level)
 {
     uint16_t mv;
 
-    if (!level || level > NUM_PWR) {
+    if (!level || level > rf_pa_power_count()) {
       mv = 0;
       rf_detector_target = 0;
       rf_detector = 0;
@@ -221,7 +200,7 @@ void rf_pa_init(void)
     LL_DAC_Enable(DAC1, LL_DAC_CHANNEL_2);
     rf_pa_enable(false); // keep PA off at boot
 
-    for (uint8_t idx = 1; idx <= NUM_PWR; idx++) {
+    for (uint8_t idx = 1; idx <= rf_pa_power_count(); idx++) {
       rf_pa_read_eeprom(idx);
     }
 }

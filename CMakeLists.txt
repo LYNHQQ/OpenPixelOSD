@@ -120,25 +120,31 @@ else()
 endif()
 
 if(BUILD_VARIANT STREQUAL "VTX")
-    message(STATUS "Building with VTX support")
+    message(STATUS "Building generic target with VTX support")
     set(BUILD_NAME "_VTX")
     add_compile_definitions(BUILD_VARIANT_VTX)
     add_compile_definitions(TARGET_GENERIC)
-    set(VTX_SRC
+    set(VARIANT_SRC
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/settingsMenu.c)
+            ./src/settingsMenu.c
+            ./src/targets/generic.c)
 elseif(BUILD_VARIANT STREQUAL "PIXELVTX")
     message(STATUS "Building pixelVTX")
     set(BUILD_NAME "_pixelVTX")
     add_compile_definitions(BUILD_VARIANT_VTX)
     add_compile_definitions(TARGET_PIXELVTX)
-    set(VTX_SRC
+    set(VARIANT_SRC
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/settingsMenu.c)
+            ./src/settingsMenu.c
+            ./src/targets/pixelVTX.c)
+else()
+  message(STATUS "Building generic target")
+  set(VARIANT_SRC
+            ./src/targets/generic.c)
 endif()
 
 add_compile_definitions(
@@ -157,7 +163,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ${STARTUP_ASSEMBLY_FILE}
         ${SOURCE}
-        ${VTX_SRC}
+        ${VARIANT_SRC}
         ./src/stm32g4xx/stm32g4xx_it.c
         ./src/stm32g4xx/system_stm32g4xx.c
         ./src/stm32g4xx/sysmem.c
@@ -188,6 +194,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+        ./src/targets
         ./src/stm32g4xx
         ./src/msp
         ./src

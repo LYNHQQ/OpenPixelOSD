@@ -17,6 +17,7 @@
 #include "stm32g4xx_ll_pwr.h"
 #include "stm32g4xx_ll_spi.h"
 #include "stm32g4xx_ll_tim.h"
+#include "stm32g4xx_ll_hrtim.h"
 #include "stm32g4xx_ll_usart.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_adc.h"
@@ -40,7 +41,7 @@
 #endif /* MCU_TYPE */
 
 #define ROW_SIZE                                16
-#define COLUMN_SIZE                             38
+#define COLUMN_SIZE                             30
 
 #define VISUAL_PICTURE_LINE_NS                  49000
 #define LINE_START_DELAY_NS                     5500
@@ -149,6 +150,7 @@ void TIM2_Init(void);
 void TIM7_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);
+void HRTIM1_Init(void);
 
 void COMP2_Init(void);
 void COMP3_Init(void);

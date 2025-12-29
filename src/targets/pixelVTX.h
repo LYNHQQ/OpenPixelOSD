@@ -5,7 +5,7 @@
 #define SPI2_CS_GPIO_Port                       GPIOB
 #define SPI2_SCK_Pin                            LL_GPIO_PIN_6
 #define SPI2_SCK_GPIO_Port                      GPIOB
-#define SPI2_MOSI_Pin                           LL_GPIO_PIN_9
+#define SPI2_MOSI_Pin                           LL_GPIO_PIN_10
 #define SPI2_MOSI_GPIO_Port                     GPIOB
 
 #define ADC_RESERVED_Pin                        LL_GPIO_PIN_14

@@ -93,8 +93,10 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
         case 1:
             break;
         case 2:
+            LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, debug0);
             break;
         case 3:
+            LL_TIM_SetAutoReload(TIM1, debug0);
             break;
         case 4:
             break;

@@ -47,6 +47,8 @@ void DAC1_Init(void)
 
 }
 
+extern uint32_t dacShadow;
+
 void DAC3_Init(void)
 {
     LL_DAC_InitTypeDef DAC_InitStruct = {0};
@@ -57,7 +59,7 @@ void DAC3_Init(void)
     /* DAC3 DMA Init */
 
     /* DAC3_CH1 Init */
-    LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_1, LL_DMAMUX_REQ_TIM1_UP);
+    LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_1, LL_DMAMUX_REQ_TIM1_UP);//LL_DMAMUX_REQ_HRTIM1_A);//LL_DMAMUX_REQ_TIM1_UP);
     LL_DMA_SetPeriphAddress(DMA2, LL_DMA_CHANNEL_1, (uint32_t)&DAC3->DHR12R1);
 
     LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_CHANNEL_1, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);

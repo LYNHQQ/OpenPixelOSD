@@ -471,7 +471,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           sync_voltage_black = DAC12BIT_TO_MV(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           
           if((syncState == SYNC_STATE_EXTERNAL) && (sync_voltage_black > sync_voltage_low) && (sync_voltage_black - sync_voltage_low > 100)) {
-            sync_voltage = (sync_voltage_black + sync_voltage_low) / 2;
+            sync_voltage = sync_voltage_black - (sync_voltage_black - sync_voltage_low) / 2;
             LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
           }
         }

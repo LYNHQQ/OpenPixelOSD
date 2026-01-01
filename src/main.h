@@ -121,6 +121,7 @@ typedef enum {
 
 #define BOXID_CAM_SWITCH                        MSP_BOXID_CAMERA_CONTROL_1
 
+#define COLOR_SYNC                              1
 
 #if defined(TARGET_PIXELVTX)
 #include "targets\pixelVTX.h"
@@ -147,6 +148,7 @@ void OPAMP6_Init(void);
 
 void TIM1_Init(void);
 void TIM2_Init(void);
+void TIM3_Init(void);
 void TIM7_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);

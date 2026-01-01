@@ -101,7 +101,7 @@ void uart1_init(void)
     {
     }
 
-    NVIC_SetPriority(DMA2_Channel2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 1, 0));
+    NVIC_SetPriority(DMA2_Channel2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
     NVIC_EnableIRQ(DMA2_Channel2_IRQn);
 
     LL_USART_EnableIT_ERROR(USART1); 
@@ -132,7 +132,7 @@ void uart1_dma_rx_start(void)
 
     LL_USART_EnableDMAReq_RX(USART1);
 
-    NVIC_SetPriority(DMA2_Channel3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 1, 0));
+    NVIC_SetPriority(DMA2_Channel3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 2, 0));
     NVIC_EnableIRQ(DMA2_Channel3_IRQn);
 }
 

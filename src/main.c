@@ -100,7 +100,7 @@ int main (void)
         video_sync_loop();
 #if defined(BUILD_VARIANT_VTX)
         msp_menu();
-        rf_pa_loop();
+        //rf_pa_loop();
 #endif
 
 #if 0 // TODO: remove later

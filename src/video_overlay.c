@@ -24,7 +24,17 @@
 #define OPAMP_CONST_IO1     ((VIDEO_TOTAL_GAIN / VIDEO1_INPUT_GAIN) == 1 ? 0x108000E5U : 0x108000C5U)  // Positive Input IO1 (e.g., PA3) - video generator input
 #define OPAMP_CONST_IO2     ((VIDEO_TOTAL_GAIN / VIDEO2_INPUT_GAIN) == 1 ? 0x108000E9U : 0x108000C9U)  // Positive Input IO2 (e.g., PA7) - video input form camera
 
-#define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC)
+#define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC) Follower mode
+#define OPAMP_CONST_DAC_MOD 0x108200CDU  // Positive Input DAC1_OUT1 (internal DAC) non inverting gain =2 with VINM0 pin for input or bias
+
+//    28      24      20      16      12       8       4       0
+//  0001    0000    1000    0000    0000    0000    1110    1101
+//                                                          11 DAC3_CH1 connected to OPAMP1 VINP input
+//                                                   11 opamp_out connected to OPAMP VINM input (Follower mode)
+//                                                   10 Feedback resistor is connected to OPAMP VINM input (PGA mode), Inverting input selection is depends on the PGA_GAIN setting
+//                           000    00  Non inverting internal gain =2
+//                           010    00  Inverting gain = -1 / non inverting gain =2 with VINM0 pin for input or bias
+//  0001    0000    1000    0010    0000    0000    1100    1101
 
 #define OFFSET_Y            (16)
 #define LINE_BUF_SZ         (PIXELS_PER_LINE+1)
@@ -34,21 +44,44 @@
 #define OFFSET_WHITE        700
 #define OFFSET_GREY         250
 
+#define OFFSET_YELLOW       660
+#define OFFSET_CYAN         520
+#define OFFSET_GREEN        440
+#define OFFSET_MAGENTA      300
+#define OFFSET_RED          220
+#define OFFSET_BLUE         100
+
+#define PHASE_YELLOW        326
+#define PHASE_CYAN          1280
+#define PHASE_GREEN         10
+#define PHASE_MAGENTA       715
+#define PHASE_RED           580
+#define PHASE_BLUE          1180
+
+
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
 #define DAC_WHITE           (DAC_BLACK + DAC12BIT_FROM_MV(OFFSET_WHITE))
 #define DAC_GRAY            (DAC_BLACK + DAC12BIT_FROM_MV(OFFSET_GREY))
 #define DAC_SYNC            (DAC_BLACK - DAC12BIT_FROM_MV(OFFSET_SYNC))
 
-#define MAX_RENDER_LINE     (303) // for PAL
+
+#define MAX_RENDER_LINE_PAL   (303)
+#define MAX_RENDER_LINE_NTSC  (250)
 
 #define LOGO_OFFSET_X       (90)
 #define LOGO_OFFSET_Y       (25)
 
-uint32_t opa_val[8] = { OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, 
-                        OPAMP_CONST_IO0, OPAMP_CONST_IO0, OPAMP_CONST_IO0, OPAMP_CONST_IO0  };
+uint32_t opa_val[10] = {  OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, 
+                          OPAMP_CONST_DAC_MOD, OPAMP_CONST_DAC_MOD, OPAMP_CONST_DAC_MOD, 
+                          OPAMP_CONST_DAC_MOD, OPAMP_CONST_DAC_MOD, OPAMP_CONST_DAC_MOD  };
 
-uint16_t video_level[9] = { DAC_SYNC, DAC_BLACK, DAC_BLACK, DAC_WHITE, DAC_GRAY,
-                                      DAC_BLACK, DAC_GRAY, DAC_WHITE, DAC_GRAY};
+uint32_t phase_val[10] = {  20, 20, PHASE_MAGENTA, 20, 
+                            PHASE_YELLOW, PHASE_CYAN, PHASE_GREEN, 
+                            PHASE_MAGENTA, PHASE_RED, PHASE_BLUE  };
+
+
+uint16_t video_level[11] = {0};
+
 
 uint16_t* video_levels = &video_level[1];
 uint32_t* opa_vals = &opa_val[0];
@@ -62,13 +95,16 @@ uint16_t sync_voltage_black = SYNC_START_MV;
 uint16_t sync_voltage_low = 0;
 osdState_e osdState = OSD_INIT;
 static uint8_t sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
+uint8_t colorSync = 0;
 
 videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
                                 {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
 uint8_t activeVideoInput;
 
-static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORLD/WORLD
-static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORLD/WORLD
+static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
+static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
+static uint32_t phase_buff[2][LINE_BUF_SZ]; // double buffer for color phase  DMA WORLD/WORLD
+
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
 CCMRAM_DATA static uint32_t video_source;
 extern volatile bool video_gen_enabled;
@@ -83,6 +119,10 @@ extern uint8_t active_video_buffer;
 extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 #endif
 
+#ifdef TRIGGER_LINE
+uint16_t triggerLine = TRIGGER_LINE;
+#endif
+
 EXEC_RAM static void set_black_level(uint32_t new_level)
 {
   if (new_level > DAC12BIT_FROM_MV(OFFSET_SYNC))
@@ -94,6 +134,14 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
   video_level[2] = (new_level + DAC12BIT_FROM_MV(OFFSET_TRANSPARENT)) * VIDEO_TOTAL_GAIN;
   video_level[3] = (new_level + DAC12BIT_FROM_MV(OFFSET_WHITE)) * VIDEO_TOTAL_GAIN;
   video_level[4] = (new_level + DAC12BIT_FROM_MV(OFFSET_GREY)) * VIDEO_TOTAL_GAIN;
+  
+  uint16_t colorOffset = 200;
+  video_level[5] = (new_level + DAC12BIT_FROM_MV(OFFSET_YELLOW + colorOffset) );
+  video_level[6] = (new_level + DAC12BIT_FROM_MV(OFFSET_CYAN + colorOffset));
+  video_level[7] = (new_level + DAC12BIT_FROM_MV(OFFSET_GREEN + colorOffset));
+  video_level[8] = (new_level + DAC12BIT_FROM_MV(OFFSET_MAGENTA + colorOffset));
+  video_level[9] = (new_level + DAC12BIT_FROM_MV(OFFSET_RED + colorOffset));
+  video_level[10]= (new_level + DAC12BIT_FROM_MV(OFFSET_BLUE + colorOffset));
 
 #ifdef ALPHA_CHANNEL
   video_level[5] = new_level;
@@ -111,8 +159,10 @@ EXEC_RAM static void init_buffers()
     for (uint32_t j = 0; j < LINE_BUF_SZ; j++) {
         dac_buff[0][j] = DAC_GRAY;
         opamp_buff[0][j] = video_source;
+        phase_buff[0][j] = 0;
         dac_buff[1][j] = DAC_GRAY;
         opamp_buff[1][j] = video_source;
+        phase_buff[1][j] = 0;
     }
 }
 
@@ -120,7 +170,6 @@ EXEC_RAM static void set_video_source(uint32_t source)
 {
   video_source = source;
   opa_val[1] = source;
-  opa_val[5] = source;
   OPAMP1->CSR = source;
 }
 
@@ -163,6 +212,7 @@ void video_overlay_init(void)
     OPAMP1_Init(); // OPAMP1 as multiplexer for video source selection
     TIM1_Init(); // TIM1 for video line generation
     TIM2_Init(); // TIM2 detect HSYNC VSYNC video input
+    TIM3_Init();
     TIM15_Init(); // TIM15 delay for video line generation start
     TIM17_Init(); // TIM17 for video generator
     COMP2_Init(); // COMP2 for video sync detection
@@ -185,6 +235,10 @@ void video_overlay_init(void)
     LL_TIM_EnableCounter(TIM2);
     LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
 
+    LL_TIM_EnableIT_CC1(TIM3);
+    LL_TIM_EnableCounter(TIM3);
+    LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1);
+    
     LL_DAC_Enable(DAC3, LL_DAC_CHANNEL_2);
     LL_DAC_Enable(DAC3, LL_DAC_CHANNEL_1);
 
@@ -254,7 +308,8 @@ EXEC_RAM static void squash_canvas_raw_pixel_buff(char c, uint32_t glyph_row, ui
 
 void render_overlay_logo_line(uint16_t line)
 {
-    if (line >= MAX_RENDER_LINE) return;
+    if (videoMode == MODE_PAL && line >= MAX_RENDER_LINE_PAL) return;
+    if (videoMode == MODE_NTSC && line >= MAX_RENDER_LINE_NTSC) return;
 
     // Logo line considering vertical offset
     if (line < LOGO_OFFSET_Y || (line - LOGO_OFFSET_Y) >= LOGO_HEIGHT) {
@@ -292,38 +347,73 @@ void render_overlay_logo_line(uint16_t line)
     }
 }
 
+uint32_t phase_offset = 0;
+uint32_t phase_offset2 = 614;
+uint32_t offset_amp = 300;
+
 void render_test_pattern_line(uint16_t line)
 {
-    if (line >= MAX_RENDER_LINE) return;
+    if (videoMode == MODE_PAL && line >= 105) return;
+    if (videoMode == MODE_NTSC && line >= 105) return;
 
-    // Logo line considering vertical offset
-    if (line < LOGO_OFFSET_Y || line  >= 50) {
-        // Line outside the logo area — do nothing, keep existing buffer contents
-        return;
-    }
-    
-    uint8_t alt;
+    uint16_t barline;
 
-    //alt = line & 0x01;
-    //alt = ((frame_counter>>1) & 0x01) ^ (line & 0x01);
-    //alt = ((frame_counter>>1) & 0x01) ;
-
-    for (uint16_t buf_index = 50; buf_index < 150; buf_index++) {
-      if(alt) {
-          
-          dac_buff[buf_idx][buf_index] = video_levels[1] + DAC12BIT_FROM_MV(700);
-          opamp_buff[buf_idx][buf_index++] = opa_vals[0];
-
-          dac_buff[buf_idx][buf_index] = video_levels[1] - DAC12BIT_FROM_MV(250);
-          opamp_buff[buf_idx][buf_index] = opa_vals[0];
-      } else {
-
-          dac_buff[buf_idx][buf_index] = video_levels[1] - DAC12BIT_FROM_MV(250);
-          opamp_buff[buf_idx][buf_index++] = opa_vals[0];
-
-          dac_buff[buf_idx][buf_index] = video_levels[1] + DAC12BIT_FROM_MV(700);
-          opamp_buff[buf_idx][buf_index] = opa_vals[0];
+    if (line < 25 || line >= 185) {
+      for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
+        dac_buff[buf_idx][i] = video_levels[1];
+        opamp_buff[buf_idx][i] = video_source;
+        phase_buff[buf_idx][i] = phase_val[1];
       }
+    } else {
+      barline = ((line - 25) / 8); 
+
+      //HRTIM1->sTimerxRegs[1].CMP1CxR = (phase_offset) % 1520;
+      //HRTIM1->sTimerxRegs[1].CMP1CxR = phase_val[barline];
+      
+      //if(barline == 1)
+      //  barline++;
+      //phase_buff[buf_idx][0] = phase_val[barline];
+
+      for (uint16_t i = 0; i < 50; i++ ) {
+        dac_buff[buf_idx][i] = video_levels[1];
+        opamp_buff[buf_idx][i] = video_source;
+        phase_buff[buf_idx][i] = phase_val[1];
+      }
+      
+      for (uint16_t buf_index = 50; buf_index < 100; buf_index++ ) {
+          dac_buff[buf_idx][buf_index] = video_levels[barline] - 200;
+          opamp_buff[buf_idx][buf_index] = opa_vals[barline];
+          phase_buff[buf_idx][buf_index] = phase_val[barline];
+      }
+      for (uint16_t buf_index = 100; buf_index < 150; buf_index++ ) {
+          dac_buff[buf_idx][buf_index] = video_levels[barline] - 100;
+          opamp_buff[buf_idx][buf_index] = opa_vals[barline];
+          phase_buff[buf_idx][buf_index] = phase_val[barline];
+      }
+      for (uint16_t buf_index = 150; buf_index < 200; buf_index++ ) {
+          dac_buff[buf_idx][buf_index] = video_levels[barline];
+          opamp_buff[buf_idx][buf_index] = opa_vals[barline];
+          phase_buff[buf_idx][buf_index] = phase_val[barline];
+      }
+      for (uint16_t buf_index = 200; buf_index < 250; buf_index++ ) {
+          dac_buff[buf_idx][buf_index] = video_levels[barline] + 100;
+          opamp_buff[buf_idx][buf_index] = opa_vals[barline];
+          phase_buff[buf_idx][buf_index] = phase_val[barline];
+      }
+      for (uint16_t buf_index = 250; buf_index < 300; buf_index++ ) {
+          dac_buff[buf_idx][buf_index] = video_levels[barline] + 200;
+          opamp_buff[buf_idx][buf_index] = opa_vals[barline];
+          phase_buff[buf_idx][buf_index] = phase_val[barline];
+      }
+      for (uint16_t i = 300; i < LINE_BUF_SZ; i++ ) {
+        dac_buff[buf_idx][i] = video_levels[1];
+        opamp_buff[buf_idx][i] = video_source;
+        phase_buff[buf_idx][i] = phase_val[1];
+      }
+
+      dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
+      opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
+      phase_buff[buf_idx][LINE_BUF_SZ-1] = phase_val[1];
     }
 }
 
@@ -375,9 +465,9 @@ EXEC_RAM void render_video_line(uint16_t line)
     draw_line = line - 1;
 
     uint8_t *line_ptr = video_frame_buffer[!active_video_buffer][draw_line];
-    if (draw_line < 100) {
-      return;
-    }
+    
+    phase_buff[buf_idx][0] = phase_val[2];
+
     if (draw_line >= VIDEO_HEIGHT) {
       for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
         dac_buff[buf_idx][i] = video_levels[1];
@@ -385,6 +475,7 @@ EXEC_RAM void render_video_line(uint16_t line)
       }
     } else {
       uint32_t buf_idx_local = 0;
+
       for (uint32_t i = 0; i < VIDEO_BYTES_PER_LINE; i++) {
           uint8_t byte = line_ptr[i];
           uint8_t pixel;
@@ -392,42 +483,49 @@ EXEC_RAM void render_video_line(uint16_t line)
           if (buf_idx_local >= LINE_BUF_SZ) break;
           pixel = (byte >> 6) & 0x3;
           dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
+          phase_buff[buf_idx][buf_idx_local] = phase_val[pixel];
           opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
           if (buf_idx_local >= LINE_BUF_SZ) break;
           pixel = (byte >> 4) & 0x3;
           dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
+          phase_buff[buf_idx][buf_idx_local] = phase_val[pixel];
           opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
           if (buf_idx_local >= LINE_BUF_SZ) break;
           pixel = (byte >> 2) & 0x3;
           dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
+          phase_buff[buf_idx][buf_idx_local] = phase_val[pixel];
           opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
 
           if (buf_idx_local >= LINE_BUF_SZ) break;
           pixel = byte & 0x3;
           dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
+          phase_buff[buf_idx][buf_idx_local] = phase_val[pixel];
           opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
       }
       dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
       opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
     }
+
 }
 #endif
+
+uint32_t compBlank = 0;
 
 EXEC_RAM static void push_line_to_dma(uint16_t line)
 {
     buf_idx = (line & 1);
-    // Stop TIM1 and both DMA channels
+    // Stop TIM1
     LL_TIM_DisableCounter(TIM1);
-    //LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
-    //LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
 
     // Configure length and addresses
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_1, (uint32_t)&opamp_buff[!buf_idx][0]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
     LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_1, (uint32_t)&dac_buff[!buf_idx][0]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
+    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_5, (uint32_t)&phase_buff[!buf_idx][0]); // ! send previous buffer
+    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_5, LINE_BUF_SZ);
 
     // Enable DMA request for DAC
     LL_DAC_EnableDMAReq(DAC3, LL_DAC_CHANNEL_1);
@@ -435,6 +533,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     // Enable both DMA channels
     LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_1); // first start DAC channel
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
+    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_5);
 
     LL_TIM_EnableDMAReq_UPDATE(TIM1);
 
@@ -450,6 +549,8 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
       render_overlay_logo_line(line);  
     }
 }
+uint16_t sync_offset = 0;
+uint16_t comp_blank = 0;
 
 EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
 {
@@ -460,16 +561,21 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
     if(time_ns > 59.f && time_ns < 65.f) {
         video_line++;
         #ifdef TRIGGER_LINE
-        if (video_line == TRIGGER_LINE) {
+        if (video_line == triggerLine) {
           LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
         }
         #endif
-        if (video_line <= MAX_RENDER_LINE) {
+        if ((videoMode == MODE_PAL && video_line <= MAX_RENDER_LINE_PAL) || (videoMode == MODE_NTSC && video_line <= MAX_RENDER_LINE_NTSC)) {
+            #if COLOR_SYNC == 1
             if (video_gen_enabled == false) {
-            LL_TIM_SetSlaveMode(TIM2, LL_TIM_SLAVEMODE_DISABLED);
-              LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage_black) * videoInputs[activeVideoInput].gain);
-              //LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_A, LL_HRTIM_RESETTRIG_EEV_1);
+              LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP3);
+              LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP3);
+              LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage_black-sync_offset) * videoInputs[activeVideoInput].gain);
+              LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_EEV_1);
+              colorSync  = 1;
+              //HRTIM1->sTimerxRegs[1].CMP1CxR = phase_buff[!buf_idx][0];
             }
+            #endif
             push_line_to_dma(video_line);
         }
         if (new_field == false) {
@@ -499,7 +605,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(LOW_SYNC_ADC_DELAY_NS));
         }
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
-        if ((videoMode = MODE_PAL && vsync == 8) || (videoMode = MODE_NTSC && vsync == 9)) {
+        if ((videoMode == MODE_PAL && vsync == 8) || (videoMode == MODE_NTSC && vsync == 9)) {
           
           if (new_field == true) {
             new_field = false;
@@ -509,6 +615,8 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           video_line = 0;
         }
     } else {
+        //uint16_t t = time_ns * 10;
+        //TRACE_INFO_WP("%i\n",t);
         vsync = 0;
         // Do nothing, wait for next sync
     }
@@ -531,8 +639,10 @@ EXEC_RAM static inline void check_resync(uint32_t tim_tick)
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
         if (vsync == 8) {
           videoMode = MODE_PAL;
+          TRACE_INFO_WP("videoMode PAL\n");
         } else if (vsync == 9) {
           videoMode = MODE_NTSC;
+          TRACE_INFO_WP("videoMode NTSC\n");
         }else {
           vsync = 0;
         }
@@ -573,11 +683,7 @@ EXEC_RAM void TIM2_IRQHandler(void)
             syncState = SYNC_STATE_EXTERNAL;
 
           } else if (syncState == SYNC_STATE_EXTERNAL) {
-              
-
               pars_video_signal(TIM2->CCR2);
-              
-
               set_black_level(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           }
       }
@@ -586,19 +692,41 @@ EXEC_RAM void TIM2_IRQHandler(void)
     if (LL_TIM_IsActiveFlag_CC3(TIM2)) {
       //LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
       
-      // Stop TIM1 and both DMA channels
-      //LL_HRTIM_TIM_CounterDisable(HRTIM1, LL_HRTIM_TIMER_MASTER);
-      //LL_HRTIM_TIM_CounterDisable(HRTIM1, LL_HRTIM_TIMER_A);
       LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
       LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
+      LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_5);
 
       OPAMP1->CSR = video_source;
 
-      LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
-      //LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_A, LL_HRTIM_RESETTRIG_NONE);
-      LL_TIM_SetSlaveMode(TIM2, LL_TIM_SLAVEMODE_RESET);
+      #if COLOR_SYNC == 1
+        LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
+
+        LL_TIM_ConfigETR(TIM2, LL_TIM_ETR_POLARITY_NONINVERTED, LL_TIM_ETR_PRESCALER_DIV1, LL_TIM_ETR_FILTER_FDIV4_N8);
+        LL_TIM_IC_SetActiveInput(TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_ACTIVEINPUT_DIRECTTI);
+        LL_TIM_IC_SetPrescaler(TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_ICPSC_DIV1);
+        LL_TIM_IC_SetFilter(TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_IC_FILTER_FDIV4_N6);
+        LL_TIM_IC_SetPolarity(TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_IC_POLARITY_RISING);
+
+        LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP2);
+        LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP2);
+
+
+      #endif
 
       LL_TIM_ClearFlag_CC3(TIM2);
+    }
+}
+
+void TIM3_IRQHandler(void)
+{  
+  if (LL_TIM_IsActiveFlag_CC1(TIM3)) {
+      //LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
+      if (colorSync) {
+        colorSync = 0;
+        LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, 0);
+        LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_NONE);
+      }
+      LL_TIM_ClearFlag_CC1(TIM3);
     }
 }
 

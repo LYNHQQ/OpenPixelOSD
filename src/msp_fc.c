@@ -30,6 +30,13 @@ uint8_t mspStickpos(void) {
   return result;
 }
 
+extern uint16_t sync_offset;
+extern uint32_t phase_offset;
+extern uint32_t phase_offset2;
+extern uint32_t offset_amp;
+extern uint32_t phase_val[10];
+extern uint16_t triggerLine;
+
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
     uint32_t status;
@@ -94,13 +101,28 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             break;
         case 2:
             LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, debug0);
+            LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, debug0);
             break;
         case 3:
-            LL_TIM_SetAutoReload(TIM1, debug0);
+            triggerLine = debug0;
             break;
         case 4:
+            LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
             break;
         case 5:
+            phase_val[5] = debug0;
+            break;
+        case 6:
+            phase_val[6] = debug0;
+            break;
+        case 7:
+            phase_val[7] = debug0;
+            break;
+        case 8:
+            phase_val[8] = debug0;
+            break;
+        case 9:
+            phase_val[9] = debug0;
             break;
         default:
             break;

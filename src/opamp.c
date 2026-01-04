@@ -42,6 +42,34 @@ void OPAMP1_Init(void)
     LL_OPAMP_SetTrimmingMode(OPAMP1, LL_OPAMP_TRIMMING_FACTORY);
 }
 
+void OPAMP5_Init(void)
+{
+
+  LL_OPAMP_InitTypeDef OPAMP_InitStruct = {0};
+  
+
+  #if 0
+  LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+  LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOB);
+  /**OPAMP5 GPIO Configuration
+  PA8   ------> OPAMP4_VOUT
+  */
+  GPIO_InitStruct.Pin = LL_GPIO_PIN_8;
+  GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = LL_GPIO_PULL_DOWN;
+  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  #endif
+
+  OPAMP_InitStruct.PowerMode = LL_OPAMP_POWERMODE_HIGHSPEED;
+  OPAMP_InitStruct.FunctionalMode = LL_OPAMP_MODE_FOLLOWER;
+  OPAMP_InitStruct.InputNonInverting = LL_OPAMP_INPUT_NONINVERT_DAC;
+  LL_OPAMP_Init(OPAMP5, &OPAMP_InitStruct);
+  LL_OPAMP_SetInputsMuxMode(OPAMP5, LL_OPAMP_INPUT_MUX_DISABLE);
+  LL_OPAMP_SetInternalOutput(OPAMP5, LL_OPAMP_INTERNAL_OUPUT_DISABLED);
+  LL_OPAMP_SetTrimmingMode(OPAMP5, LL_OPAMP_TRIMMING_FACTORY);
+
+}
+
 
 #if defined(ALPHA_CHANNEL) && defined(STM32G474xx)
 void OPAMP6_Init(void)

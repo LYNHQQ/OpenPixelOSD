@@ -140,15 +140,18 @@ uint16_t adc_read_black_level(void);
 
 void DAC1_Init(void);
 void DAC3_Init(void);
+void DAC4_Init(void);
 
 void dma_init(void);
 
 void OPAMP1_Init(void);
+void OPAMP5_Init(void);
 void OPAMP6_Init(void);
 
 void TIM1_Init(void);
 void TIM2_Init(void);
 void TIM3_Init(void);
+void TIM4_Init(void);
 void TIM7_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);

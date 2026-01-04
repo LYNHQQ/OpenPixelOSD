@@ -17,6 +17,8 @@ uint8_t boxIdIdx = 0;
 
 uint16_t debug0;
 uint16_t debug1;
+uint16_t debug2;
+uint16_t debug3;
 
 uint8_t mspStickpos(void) {
   uint8_t result = 0;
@@ -31,16 +33,18 @@ uint8_t mspStickpos(void) {
 }
 
 extern uint16_t sync_offset;
-extern uint32_t phase_offset;
-extern uint32_t phase_offset2;
-extern uint32_t offset_amp;
-extern uint32_t phase_val[10];
+extern float phase_offset;
+extern uint32_t phase_test;
+extern uint32_t phase_val[2][10];
 extern uint16_t triggerLine;
+extern uint8_t colorAlternate;
 
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
     uint32_t status;
     UNUSED(owner);
+    static float phase;
+    
 
     switch(msp_cmd) {
     case MSP_STATUS:
@@ -90,7 +94,9 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
     case MSP_DEBUG:
         debug0 = payload[0] + (uint16_t)(payload[1]<<8);
         debug1 = (uint16_t)payload[2];
-        TRACE_INFO("target_debug %04x %04x\n", debug0, debug1);
+        debug2 = payload[4] + (uint16_t)(payload[5]<<8);
+        debug3 = payload[6] + (uint16_t)(payload[7]<<8);
+        TRACE_INFO("target_debug %04x %04x %04x %04x\n", debug0, debug1, debug2, debug3);
         switch (debug1) {
         case 0:
 #if defined(BUILD_VARIANT_VTX)
@@ -98,31 +104,45 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
 #endif
             break;
         case 1:
+            
             break;
         case 2:
-            LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, debug0);
-            LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, debug0);
+            colorAlternate = debug0;
             break;
         case 3:
+            #ifdef TRIGGER_LINE
             triggerLine = debug0;
+            #endif
+            if (debug0) {
+              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
+              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (debug0 + 500) % 1520);
+            } else {
+              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug2);
+              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, debug3);
+            }
+            
+
             break;
         case 4:
-            LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
-            break;
         case 5:
-            phase_val[5] = debug0;
-            break;
         case 6:
-            phase_val[6] = debug0;
-            break;
         case 7:
-            phase_val[7] = debug0;
-            break;
         case 8:
-            phase_val[8] = debug0;
-            break;
         case 9:
-            phase_val[9] = debug0;
+            {
+
+              
+              phase = debug0;
+
+              //for ( uint8_t x = 0; x < 2; x++) {
+              //  phase_val[x][debug1] = (uint16_t)((720 + x * 360 - phase * (1 - x * 2) - 45 - (1 - x) * 90) / 360 * 1227) % 1227;
+              //}
+              
+              for ( uint8_t x = 0; x < 2; x++) {
+                phase_val[x][debug1] = (uint16_t)((360 + phase) / 360 * 1520) % 1520;
+              }
+
+            }
             break;
         default:
             break;

@@ -70,7 +70,6 @@ void DAC3_Init(void)
     LL_DMA_SetPeriphSize(DMA2, LL_DMA_CHANNEL_1, LL_DMA_PDATAALIGN_WORD);
     LL_DMA_SetMemorySize(DMA2, LL_DMA_CHANNEL_1, LL_DMA_MDATAALIGN_HALFWORD);
 
-
     /** DAC channel OUT1 config */
     LL_DAC_SetHighFrequencyMode(DAC3, LL_DAC_HIGH_FREQ_MODE_ABOVE_160MHZ);
     LL_DAC_SetSignedFormat(DAC3, LL_DAC_CHANNEL_1, LL_DAC_SIGNED_FORMAT_DISABLE);
@@ -99,6 +98,7 @@ void DAC3_Init(void)
 
 }
 
+#if 0
 uint32_t test[4] = {500, 600, 1500, 1600};
 
 void DAC4_Init(void)
@@ -122,8 +122,6 @@ void DAC4_Init(void)
   LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MDATAALIGN_WORD);
   LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_7);
 
-  
-
 
   LL_DMA_SetPeriphRequest(DMA1, LL_DMA_CHANNEL_8, LL_DMAMUX_REQ_TIM4_CH1);
   LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_8, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
@@ -139,7 +137,6 @@ void DAC4_Init(void)
   LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_8, LL_DMA_PDATAALIGN_WORD);
   LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_8, LL_DMA_MDATAALIGN_WORD);
   LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
-
 
 
   /* Peripheral clock enable */
@@ -173,3 +170,4 @@ void DAC4_Init(void)
   LL_DAC_EnableDMAReq(DAC4, LL_DAC_CHANNEL_2);
 
 }
+#endif

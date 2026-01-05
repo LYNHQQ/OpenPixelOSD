@@ -3,7 +3,6 @@
  * Copyright (C) 2025 Vitaliy N <vitaliy.nimych@gmail.com>
  */
 #include "main.h"
-#include "stm32g4xx_hal_hrtim.h"
 
 void TIM1_Init(void)
 {
@@ -35,9 +34,6 @@ void TIM1_Init(void)
     LL_TIM_Init(TIM1, &TIM_InitStruct);
     LL_TIM_DisableARRPreload(TIM1);
     LL_TIM_SetClockSource(TIM1, LL_TIM_CLOCKSOURCE_INTERNAL);
-
-    //LL_TIM_SetOnePulseMode(TIM1, LL_TIM_ONEPULSEMODE_SINGLE);
-
     LL_TIM_SetSlaveMode(TIM1, LL_TIM_SLAVEMODE_COMBINED_RESETTRIGGER);
     LL_TIM_DisableExternalClock(TIM1);
     LL_TIM_SetTriggerInput(TIM1, LL_TIM_TS_ITR6);
@@ -120,7 +116,7 @@ void TIM2_Init(void)
     TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM1;
     TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
     TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
-    TIM_OC_InitStruct.CompareValue = NS_TO_TICKS(57000);
+    TIM_OC_InitStruct.CompareValue = NS_TO_TICKS(VISIBLE_LINE_END_NS);
     TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;
     LL_TIM_OC_Init(TIM2, LL_TIM_CHANNEL_CH3, &TIM_OC_InitStruct);
     LL_TIM_OC_DisableFast(TIM2, LL_TIM_CHANNEL_CH3);
@@ -146,6 +142,7 @@ void TIM2_Init(void)
     #endif
 }
 
+#if USE_COLOR == 1
 void TIM3_Init(void)
 {
   LL_TIM_InitTypeDef TIM_InitStruct = {0};
@@ -179,7 +176,7 @@ void TIM3_Init(void)
   TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM1;
   TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
   TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
-  TIM_OC_InitStruct.CompareValue = NS_TO_TICKS(3000);
+  TIM_OC_InitStruct.CompareValue = NS_TO_TICKS(COLOR_BURST_SYNC_GATE_CLOSE_NS);
   TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_LOW;
   LL_TIM_OC_Init(TIM3, LL_TIM_CHANNEL_CH1, &TIM_OC_InitStruct);
   LL_TIM_OC_DisableFast(TIM3, LL_TIM_CHANNEL_CH1);
@@ -199,62 +196,7 @@ void TIM3_Init(void)
   #endif
   
 }
-
-
-void TIM4_Init(void)
-{
-
-  LL_TIM_InitTypeDef TIM_InitStruct = {0};
-
-  /* Peripheral clock enable */
-  LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM4);
-
-  TIM_InitStruct.Prescaler = 0;
-  TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
-  TIM_InitStruct.Autoreload = 60;
-  TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
-  LL_TIM_Init(TIM4, &TIM_InitStruct);
-  LL_TIM_DisableARRPreload(TIM4);
-  LL_TIM_SetClockSource(TIM4, LL_TIM_CLOCKSOURCE_INTERNAL);
-  
-  LL_TIM_SetSlaveMode(TIM4, LL_TIM_SLAVEMODE_COMBINED_RESETTRIGGER);
-  LL_TIM_DisableExternalClock(TIM4);
-  LL_TIM_SetTriggerInput(TIM4, LL_TIM_TS_ITR10);
-  LL_TIM_DisableIT_TRIG(TIM4);
-  LL_TIM_DisableDMAReq_TRIG(TIM4);
-  LL_TIM_SetTriggerOutput(TIM4, LL_TIM_TRGO_UPDATE);
-  LL_TIM_DisableMasterSlaveMode(TIM4);
-  LL_TIM_EnableDMAReq_UPDATE(TIM4);
-
-  #if 1
-  LL_TIM_OC_InitTypeDef TIM_OC_InitStruct = {0};
-
-  LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM2;
-  TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
-  TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
-  TIM_OC_InitStruct.CompareValue = 31;
-  TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;
-  LL_TIM_OC_Init(TIM4, LL_TIM_CHANNEL_CH1, &TIM_OC_InitStruct);
-  LL_TIM_OC_EnableFast(TIM4, LL_TIM_CHANNEL_CH1);
-  LL_TIM_OC_EnablePreload(TIM4, LL_TIM_CHANNEL_CH1);
-
-    /**TIM4 GPIO Configuration
-    PB6     ------> TIM4_CH1
-    */
-  GPIO_InitStruct.Pin = LL_GPIO_PIN_6;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_MEDIUM;
-  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-  GPIO_InitStruct.Alternate = LL_GPIO_AF_2;
-  LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  LL_TIM_CC_EnableChannel(TIM4, LL_TIM_CHANNEL_CH1);
-  LL_TIM_EnableAllOutputs(TIM4);
-  #endif
-}
+#endif
 
 void TIM7_Init(void)
 {
@@ -384,12 +326,13 @@ void TIM17_Init(void)
     #endif
 }
 
+#if USE_COLOR == 1
 void HRTIM1_Init(void)
 { 
 
   LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_HRTIM1);
 
-
+  // Color phase shift DMA 
   LL_DMA_SetPeriphRequest(DMA2, LL_DMA_CHANNEL_5, LL_DMAMUX_REQ_TIM1_UP);
   LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_CHANNEL_5, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
   LL_DMA_SetPeriphAddress(DMA2, LL_DMA_CHANNEL_5, (uint32_t)&HRTIM1->sTimerxRegs[1].CMP1CxR);
@@ -405,11 +348,11 @@ void HRTIM1_Init(void)
   LL_HRTIM_SetSyncOutConfig(HRTIM1, LL_HRTIM_SYNCOUT_POSITIVE_PULSE);
   LL_HRTIM_SetSyncInSrc(HRTIM1, LL_HRTIM_SYNCIN_SRC_EXTERNAL_EVENT);
   LL_HRTIM_ConfigDLLCalibration(HRTIM1, LL_HRTIM_DLLCALIBRATION_MODE_SINGLESHOT, LL_HRTIM_DLLCALIBRATION_RATE_0);
-
   LL_HRTIM_StartDLLCalibration(HRTIM1);
 
   while(LL_HRTIM_IsActiveFlag_DLLRDY(HRTIM1) == RESET){}
 
+  // External event COMP2
   LL_HRTIM_EE_SetPrescaler(HRTIM1, LL_HRTIM_EE_PRESCALER_DIV1);
   LL_HRTIM_EE_SetSrc(HRTIM1, LL_HRTIM_EVENT_1, LL_HRTIM_EEV1SRC_COMP2_OUT);
   LL_HRTIM_EE_SetPolarity(HRTIM1, LL_HRTIM_EVENT_1, LL_HRTIM_EE_POLARITY_LOW);
@@ -418,7 +361,7 @@ void HRTIM1_Init(void)
 
   while(LL_HRTIM_IsActiveFlag_DLLRDY(HRTIM1) == RESET){}
 
-  // TIMER A 
+  // TIMER A (phase output)
   LL_HRTIM_TIM_SetPrescaler(HRTIM1, LL_HRTIM_TIMER_A, LL_HRTIM_PRESCALERRATIO_MUL32);
   LL_HRTIM_TIM_SetCounterMode(HRTIM1, LL_HRTIM_TIMER_A, LL_HRTIM_MODE_CONTINUOUS);
   LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, 1227);
@@ -438,7 +381,7 @@ void HRTIM1_Init(void)
   LL_HRTIM_ForceUpdate(HRTIM1, LL_HRTIM_TIMER_A);
   LL_HRTIM_TIM_CounterEnable(HRTIM1, LL_HRTIM_TIMER_A);
 
-  // TIMER B 
+  // TIMER B (phase sync timer)
   LL_HRTIM_TIM_SetPrescaler(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_PRESCALERRATIO_MUL32);
   LL_HRTIM_TIM_SetCounterMode(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_MODE_CONTINUOUS);
   LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, 1227);
@@ -458,7 +401,7 @@ void HRTIM1_Init(void)
   LL_HRTIM_TIM_CounterEnable(HRTIM1, LL_HRTIM_TIMER_B);
 
 
-  // TIMER C
+  // TIMER C (phase shift reference timer)
   LL_HRTIM_TIM_SetPrescaler(HRTIM1, LL_HRTIM_TIMER_C, LL_HRTIM_PRESCALERRATIO_MUL32);
   LL_HRTIM_TIM_SetCounterMode(HRTIM1, LL_HRTIM_TIMER_C, LL_HRTIM_MODE_CONTINUOUS);
   LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, 1227);
@@ -476,7 +419,7 @@ void HRTIM1_Init(void)
   LL_HRTIM_TIM_CounterEnable(HRTIM1, LL_HRTIM_TIMER_C);
 
   
-
+  // Phase output
   LL_HRTIM_OUT_SetPolarity(HRTIM1, LL_HRTIM_OUTPUT_TA1, LL_HRTIM_OUT_POSITIVE_POLARITY);
   LL_HRTIM_OUT_SetOutputSetSrc(HRTIM1, LL_HRTIM_OUTPUT_TA1, LL_HRTIM_OUTPUTSET_TIMCMP1);
   LL_HRTIM_OUT_SetOutputResetSrc(HRTIM1, LL_HRTIM_OUTPUT_TA1, LL_HRTIM_OUTPUTSET_TIMCMP2);
@@ -518,3 +461,4 @@ void HRTIM1_Init(void)
   #endif
 
 }
+#endif

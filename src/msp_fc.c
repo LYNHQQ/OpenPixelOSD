@@ -32,19 +32,13 @@ uint8_t mspStickpos(void) {
   return result;
 }
 
-extern uint16_t sync_offset;
-extern float phase_offset;
-extern uint32_t phase_test;
 extern uint32_t phase_val[2][10];
 extern uint16_t triggerLine;
-extern uint8_t colorAlternate;
 
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
     uint32_t status;
     UNUSED(owner);
-    static float phase;
-    
 
     switch(msp_cmd) {
     case MSP_STATUS:
@@ -107,21 +101,20 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             
             break;
         case 2:
-            colorAlternate = debug0;
+            #if USE_COLOR == 1
+            if (debug0) {
+              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
+              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (debug0 + debug2) % 1227);
+            } else {
+              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug2);
+              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, debug3);
+            }
+            #endif
             break;
         case 3:
             #ifdef TRIGGER_LINE
             triggerLine = debug0;
             #endif
-            if (debug0) {
-              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
-              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (debug0 + 500) % 1520);
-            } else {
-              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug2);
-              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, debug3);
-            }
-            
-
             break;
         case 4:
         case 5:
@@ -130,8 +123,8 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
         case 8:
         case 9:
             {
-
-              
+              #if USE_COLOR == 1
+              static float phase;
               phase = debug0;
 
               //for ( uint8_t x = 0; x < 2; x++) {
@@ -141,6 +134,7 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
               for ( uint8_t x = 0; x < 2; x++) {
                 phase_val[x][debug1] = (uint16_t)((360 + phase) / 360 * 1520) % 1520;
               }
+              #endif
 
             }
             break;

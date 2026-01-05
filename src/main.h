@@ -56,6 +56,8 @@
 
 #define BLACK_LEVEL_ADC_DELAY_NS                3300
 #define LOW_SYNC_ADC_DELAY_NS                   6000
+#define COLOR_BURST_SYNC_GATE_CLOSE_NS          3000
+#define VISIBLE_LINE_END_NS                     57000
 
 typedef enum {
   PX_BLACK = 0,
@@ -121,12 +123,22 @@ typedef enum {
 
 #define BOXID_CAM_SWITCH                        MSP_BOXID_CAMERA_CONTROL_1
 
-#define COLOR_SYNC                              1
 
 #if defined(TARGET_PIXELVTX)
 #include "targets\pixelVTX.h"
 #else
 #include "targets\generic.h"
+#endif
+
+
+#if defined(STM32G474xx) && defined(USE_COLOR) && USE_COLOR == 1 
+#define IF_USE_COLOR(arg)        arg
+#undef  COLUMN_SIZE
+#define COLUMN_SIZE              30
+#else
+#define IF_USE_COLOR(...)        { }
+#undef  USE_COLOR
+#define USE_COLOR                0
 #endif
 
 
@@ -140,18 +152,14 @@ uint16_t adc_read_black_level(void);
 
 void DAC1_Init(void);
 void DAC3_Init(void);
-void DAC4_Init(void);
 
 void dma_init(void);
 
 void OPAMP1_Init(void);
-void OPAMP5_Init(void);
-void OPAMP6_Init(void);
 
 void TIM1_Init(void);
 void TIM2_Init(void);
 void TIM3_Init(void);
-void TIM4_Init(void);
 void TIM7_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);

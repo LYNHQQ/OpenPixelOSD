@@ -15,6 +15,7 @@
 #include "fonts/font_system.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include "logo/logo.h"
 
 /* Tunable temporary buffer size for formatted text */
 #ifndef VIDEO_TEXT_TMP_MAX
@@ -24,6 +25,8 @@
 /* From canvas_char.c */
 extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
+
+extern bool show_logo;
 
 uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 CCMRAM_DATA uint8_t active_video_buffer = 0;
@@ -46,16 +49,45 @@ EXEC_RAM void video_graphics_clear_draw_buff(px_t color)
     memset(video_frame_buffer[active_video_buffer], pixel_byte, sizeof(video_frame_buffer[active_video_buffer]));
 }
 
+
 void video_draw_pixel(uint16_t x, uint16_t y, px_t color)
 {
     if (x >= VIDEO_WIDTH || y >= VIDEO_HEIGHT) return;
 
-    uint8_t *byte = &video_frame_buffer[active_video_buffer][y][x >> 2];
-    uint8_t shift = 6 - ((x & 0x3) << 1);
+    const uint8_t mask = (1 << VIDEO_BPP) - 1;
 
-    *byte &= ~(0x3 << shift);
-    *byte |= ((color & 0x3) << shift);
+    uint32_t bit_index  = x * VIDEO_BPP;
+    uint32_t byte_index = bit_index >> 3;
+    uint8_t  shift      = 7 - (bit_index & 7);
+
+    uint8_t *byte = &video_frame_buffer[active_video_buffer][y][byte_index];
+
+    #if VIDEO_BPP == 3
+    if (shift + 1U >= VIDEO_BPP) {
+    #endif 
+        uint8_t s = shift + 1 - VIDEO_BPP;
+        *byte &= ~(mask << s);
+        *byte |= ((color & mask) << s);
+        return;
+    #if VIDEO_BPP == 3
+    } else if (shift == 1) {
+      *byte &= ~0x03;
+      *byte |=  (color>>1) & 0x03;
+
+      uint8_t *byte2 = byte + 1;
+      *byte2 &= ~(0x01<<7);
+      *byte2 |=  (color & 0x01)<<7;
+    } else {
+      *byte &= ~0x01;
+      *byte |=  (color>>2) & 0x01;
+
+      uint8_t *byte2 = byte + 1;
+      *byte2 &= ~(0x03<<6);
+      *byte2 |=  (color & 0x03)<<6;
+    }
+    #endif
 }
+
 
 EXEC_RAM static inline void vg_put_px2(uint16_t x, uint16_t y, uint8_t v2)
 {
@@ -117,8 +149,36 @@ EXEC_RAM void video_render_canvas_from_map(void)
     video_graphics_draw_complete();
 }
 
+#define LOGO_OFFSET_X       (90)
+#define LOGO_OFFSET_Y       (25)
+
+void video_graphics_draw_logo()
+{
+    for (uint16_t y = 0; y < LOGO_HEIGHT; y++) {
+      const uint8_t *logo_line_ptr = &logo_data[y * LOGO_ROW_BYTES];
+      for (uint16_t x = 0; x < LOGO_WIDTH>>2; x++) {
+        uint8_t byte = logo_line_ptr[x];
+        uint8_t pixel;
+    
+        pixel = (byte >> 6) & 0x3;
+        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2)), LOGO_OFFSET_Y + y, (px_t)pixel);
+
+        pixel = (byte >> 4) & 0x3;
+        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2) + 1), LOGO_OFFSET_Y + y, (px_t)pixel);
+
+        pixel = (byte >> 2) & 0x3;
+        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2) + 2), LOGO_OFFSET_Y + y, (px_t)pixel);
+
+        pixel = byte & 0x3;
+        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2) + 3), LOGO_OFFSET_Y + y, (px_t)pixel);
+      }
+    }
+}
+
 EXEC_RAM void video_graphics_draw_complete(void)
 {
+    if (show_logo)
+      video_graphics_draw_logo();
     active_video_buffer ^= 1;
     video_graphics_clear_draw_buff(PX_TRANSPARENT);
 }

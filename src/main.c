@@ -140,8 +140,8 @@ void logo_timeout_check(void)
     if (!timeout_checked && (HAL_GetTick() - boot_time) >= LOGO_TIMEOUT_MS) {
         show_logo = false;
         // Clear the canvas to remove version string
-        //canvas_char_clean();
-        //canvas_char_draw_complete();
+        canvas_char_clean();
+        canvas_char_draw_complete();
         timeout_checked = true;
     }
 }

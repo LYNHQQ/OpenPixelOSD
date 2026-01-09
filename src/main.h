@@ -41,17 +41,18 @@
 #endif /* MCU_TYPE */
 
 #define ROW_SIZE                                16
-#define COLUMN_SIZE                             30
+#define COLUMN_SIZE                             41
 
-#define VISUAL_PICTURE_LINE_NS                  49000
-#define LINE_START_DELAY_NS                     5500
+#define VISUAL_PICTURE_LINE_NS                  50000
+#define LINE_CENTER_NS                          31400
 
 #define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
 #define VISUAL_PICTURE_LINE_TICKS_MAX           (NS_TO_TICKS(VISUAL_PICTURE_LINE_NS))
 #define PIXELS_PER_LINE                         (COLUMN_SIZE * 12)
-#define TIM1_AUTORELOAD                         ((uint32_t)(VISUAL_PICTURE_LINE_TICKS_MAX / PIXELS_PER_LINE))
-#define VISUAL_PICTURE_LINE_TICKS               (TIM1_AUTORELOAD * PIXELS_PER_LINE)
-#define LINE_START_DELAY                        ((VISUAL_PICTURE_LINE_TICKS_MAX - VISUAL_PICTURE_LINE_TICKS) / 2 + NS_TO_TICKS(LINE_START_DELAY_NS))
+#define TIM1_AUTORELOAD                         ((uint32_t)(VISUAL_PICTURE_LINE_TICKS_MAX / PIXELS_PER_LINE) - 1)
+#define VISUAL_PICTURE_LINE_TICKS               ((TIM1_AUTORELOAD + 1) * PIXELS_PER_LINE)
+#define LINE_START_DELAY                        (NS_TO_TICKS(LINE_CENTER_NS) - (VISUAL_PICTURE_LINE_TICKS) / 2)
+
 
 
 #define BLACK_LEVEL_ADC_DELAY_NS                3300

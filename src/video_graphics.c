@@ -149,28 +149,30 @@ EXEC_RAM void video_render_canvas_from_map(void)
     video_graphics_draw_complete();
 }
 
-#define LOGO_OFFSET_X       (90)
 #define LOGO_OFFSET_Y       (25)
 
 void video_graphics_draw_logo()
 {
     for (uint16_t y = 0; y < LOGO_HEIGHT; y++) {
       const uint8_t *logo_line_ptr = &logo_data[y * LOGO_ROW_BYTES];
+
+      uint16_t logoOffsetX = (PIXELS_PER_LINE -LOGO_WIDTH) / 2;
+
       for (uint16_t x = 0; x < LOGO_WIDTH>>2; x++) {
         uint8_t byte = logo_line_ptr[x];
         uint8_t pixel;
     
         pixel = (byte >> 6) & 0x3;
-        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2)), LOGO_OFFSET_Y + y, (px_t)pixel);
+        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2)), LOGO_OFFSET_Y + y, (px_t)pixel);
 
         pixel = (byte >> 4) & 0x3;
-        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2) + 1), LOGO_OFFSET_Y + y, (px_t)pixel);
+        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 1), LOGO_OFFSET_Y + y, (px_t)pixel);
 
         pixel = (byte >> 2) & 0x3;
-        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2) + 2), LOGO_OFFSET_Y + y, (px_t)pixel);
+        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 2), LOGO_OFFSET_Y + y, (px_t)pixel);
 
         pixel = byte & 0x3;
-        video_draw_pixel((uint16_t)(LOGO_OFFSET_X + (x<<2) + 3), LOGO_OFFSET_Y + y, (px_t)pixel);
+        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 3), LOGO_OFFSET_Y + y, (px_t)pixel);
       }
     }
 }

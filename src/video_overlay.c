@@ -27,8 +27,7 @@
 #define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC) Follower mode
 #define OPAMP_CONST_DAC_MOD 0x108200CDU  // Positive Input DAC1_OUT1 (internal DAC) non inverting gain =2 with VINM0 pin for input or bias
 
-#define OFFSET_Y            (16)
-#define LINE_BUF_SZ         (PIXELS_PER_LINE+1)
+#define LINE_BUF_SZ         (PIXELS_PER_LINE+2)
 
 #define OFFSET_SYNC         300
 #define OFFSET_TRANSPARENT  100
@@ -83,6 +82,7 @@ uint16_t sync_voltage_black = SYNC_START_MV;
 uint16_t sync_voltage_low = 0;
 osdState_e osdState = OSD_INIT;
 static uint8_t sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
+uint16_t minRenderLine = 14;
 uint16_t maxRenderLine = 0;
 
 videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
@@ -234,11 +234,13 @@ void set_video_mode(videoMode_t mode)
   videoMode = mode;
   if(mode == MODE_NTSC) {
     TRACE_INFO_WP("videoMode NTSC\n");
+    minRenderLine = 14;
     maxRenderLine = MAX_RENDER_LINE_NTSC;
     IF_USE_COLOR(set_color_system(videoMode));
 
   } else {
     TRACE_INFO_WP("videoMode PAL\n");
+    minRenderLine = 14;
     maxRenderLine = MAX_RENDER_LINE_PAL;
     IF_USE_COLOR(set_color_system(videoMode));
 
@@ -420,8 +422,7 @@ EXEC_RAM static void render_line(uint16_t line)
     char c = 0;
 
     // Offset current draw line by Y_OFFSET
-    if (line < OFFSET_Y) return;
-    draw_line = line - OFFSET_Y;
+    draw_line = line - minRenderLine;
 
     // Calculate which character row and which row in the glyph
     map_row    = draw_line / FONT_HEIGHT;  // 0..ROW_SIZE-1
@@ -429,7 +430,7 @@ EXEC_RAM static void render_line(uint16_t line)
 
     line_parity = draw_line & 1;
 
-    if (map_row >= ROW_SIZE) {
+    if (line < minRenderLine || map_row >= ROW_SIZE) {
         // Out of screen — just transparent
         for (i = 0; i < LINE_BUF_SZ; i++) {
             dac_buff[line_parity][i] = video_level[1];
@@ -438,10 +439,13 @@ EXEC_RAM static void render_line(uint16_t line)
         return;
     }
 
+    dac_buff[line_parity][0] = video_level[1];
+    opamp_buff[line_parity][0] = video_source;
+
     // Render each character of the map
     for (i = 0; i < COLUMN_SIZE; i++) {
         c = canvas_char_map[active_buffer][map_row][i]; // draw previous char map buffer
-        squash_canvas_raw_pixel_buff(c, glyph_row, i * FONT_WIDTH);
+        squash_canvas_raw_pixel_buff(c, glyph_row, 1 + i * FONT_WIDTH);
     }
 
     opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
@@ -528,30 +532,31 @@ void render_test_pattern_line(uint16_t line)
 
 EXEC_RAM void render_video_line(uint16_t line)
 {
-    CCMRAM_BSS static uint32_t draw_line = 0;
-
     #if USE_COLOR == 1
     uint32_t* phase;
     phase = phase_val[palPhase];
     phase_buff[buf_idx][0] = phase[2];
     #endif
 
-    draw_line = line - 1;
+    //if (show_test_pattern && (line < 105)) return;
 
-    uint8_t *line_ptr = video_frame_buffer[!active_video_buffer][draw_line];
-    
-    if (show_test_pattern && (line < 105)) return;
-
-    if (draw_line >= VIDEO_HEIGHT) {
+    if ((line < minRenderLine) || line >= minRenderLine + VIDEO_HEIGHT) {
       for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
         dac_buff[buf_idx][i] = video_levels[1];
         opamp_buff[buf_idx][i] = video_source;
         IF_USE_COLOR(phase_buff[buf_idx][i] = phase[1]);
       }
     } else {
+      uint8_t *line_ptr = video_frame_buffer[!active_video_buffer][line - minRenderLine];
+
       uint32_t buf_idx_local = 0;
       uint32_t word;
       uint8_t* byte = (uint8_t*)&word;
+
+      dac_buff[buf_idx][buf_idx_local] = video_levels[1];
+      IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[1]);
+      opamp_buff[buf_idx][buf_idx_local++] = opa_vals[1];
+
       for (uint32_t i = 0; i < VIDEO_BYTES_PER_LINE; i += VIDEO_BPP) {
           #if VIDEO_BPP > 3
           byte[3] = line_ptr[i + VIDEO_BPP - 4];
@@ -622,18 +627,21 @@ EXEC_RAM void render_video_line(uint16_t line)
 
 EXEC_RAM static void push_line_to_dma(uint16_t line)
 {
+
     buf_idx = (line & 1);
     // Stop TIM1 and DMA channels
     LL_TIM_DisableCounter(TIM1);
     LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
     LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-    LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_5);
+    #if USE_COLOR == 1
+    LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_8);
+    #endif
 
     // Configure length and addresses
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_1, (uint32_t)&opamp_buff[!buf_idx][0]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
     LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_1, (uint32_t)&dac_buff[!buf_idx][0]); // ! send previous buffer
-    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
+    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, (LINE_BUF_SZ));
 
     // Enable DMA request for DAC
     LL_DAC_EnableDMAReq(DAC3, LL_DAC_CHANNEL_1);
@@ -643,12 +651,13 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
     #if USE_COLOR == 1
-    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_5, (uint32_t)&phase_buff[!buf_idx][2]); // ! send previous buffer
-    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_5, LINE_BUF_SZ);
-    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_5);
+    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][2]); // ! send previous buffer
+    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
+    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_8);
     #endif
 
     LL_TIM_EnableDMAReq_UPDATE(TIM1);
+    LL_TIM_EnableDMAReq_CC1(TIM1);
 
 
 #if defined(HIGH_RAM)
@@ -677,7 +686,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         videoLineFull++;
 
         #ifdef TRIGGER_LINE
-        if (video_line_2 == triggerLine) {
+        if (videoLineFull == triggerLine) {
           LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
         } else {
           LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
@@ -707,7 +716,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         if(!(halfLine & 0x01)) {
           videoLineFull++;
           #ifdef TRIGGER_LINE
-          if (video_line_2 == triggerLine) {
+          if (videoLineFull == triggerLine) {
             LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
           } else {
             LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
@@ -737,7 +746,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
             videoLineFull++;
           }
           #ifdef TRIGGER_LINE
-          if (video_line_2 == triggerLine) {
+          if (videoLineFull == triggerLine) {
             LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
           } else {
             LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
@@ -834,7 +843,7 @@ EXEC_RAM void TIM2_IRQHandler(void)
       // Stop pixel output
       LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
       LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-      LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_5);
+      LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_8);
       OPAMP1->CSR = video_source;
       
       #if USE_COLOR == 1

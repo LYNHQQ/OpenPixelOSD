@@ -22,11 +22,14 @@
 #define VIDEO_TEXT_TMP_MAX 256
 #endif
 
+#define LOGO_OFFSET_Y       (25)
+
 /* From canvas_char.c */
 extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
 
 extern bool show_logo;
+extern bool show_test_pattern;
 
 uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 CCMRAM_DATA uint8_t active_video_buffer = 0;
@@ -41,12 +44,27 @@ void video_graphics_init(void)
 
 EXEC_RAM void video_graphics_clear_draw_buff(px_t color)
 {
-    uint8_t pixel_byte = ((color & 0x3) << 6) |
+  #if VIDEO_BPP == 3
+  uint8_t pixel_byte[3];
+  pixel_byte[0] = ((color & 0x7) << 5) | ((color & 0x7) << 2) |  ((color & 0x7) >> 1);
+  pixel_byte[1] = ((color & 0x7) << 7) | ((color & 0x7) << 4) |  ((color & 0x7) << 1) |  ((color & 0x7) >> 2);
+  pixel_byte[2] = ((color & 0x7) << 6) | ((color & 0x7) << 3) |  ((color & 0x7));
+
+  uint8_t* buffer = (uint8_t*)pixel_byte;
+
+  for(uint16_t y = 0 ; y < VIDEO_HEIGHT; y++) {
+    for(uint16_t x = 0; x< VIDEO_BYTES_PER_LINE; x++ ) {
+      video_frame_buffer[active_video_buffer][y][x] = buffer[x % 3];
+    }
+  }
+  #else
+  uint8_t pixel_byte = ((color & 0x3) << 6) |
                          ((color & 0x3) << 4) |
                          ((color & 0x3) << 2) |
                          ((color & 0x3) << 0);
 
-    memset(video_frame_buffer[active_video_buffer], pixel_byte, sizeof(video_frame_buffer[active_video_buffer]));
+  memset(video_frame_buffer[active_video_buffer], pixel_byte, sizeof(video_frame_buffer[active_video_buffer]));
+  #endif
 }
 
 
@@ -149,38 +167,56 @@ EXEC_RAM void video_render_canvas_from_map(void)
     video_graphics_draw_complete();
 }
 
-#define LOGO_OFFSET_Y       (25)
-
 void video_graphics_draw_logo()
 {
-    for (uint16_t y = 0; y < LOGO_HEIGHT; y++) {
-      const uint8_t *logo_line_ptr = &logo_data[y * LOGO_ROW_BYTES];
+  #if USE_COLOR == 1
+  uint8_t colorMatrix[] = {6,1,7,5};
+  #else
+  uint8_t colorMatrix[] = {0,1,2,3};
+  #endif
 
-      uint16_t logoOffsetX = (PIXELS_PER_LINE -LOGO_WIDTH) / 2;
+  for (uint16_t y = 0; y < LOGO_HEIGHT; y++) {
+    const uint8_t *logo_line_ptr = &logo_data[y * LOGO_ROW_BYTES];
 
-      for (uint16_t x = 0; x < LOGO_WIDTH>>2; x++) {
-        uint8_t byte = logo_line_ptr[x];
-        uint8_t pixel;
-    
-        pixel = (byte >> 6) & 0x3;
-        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2)), LOGO_OFFSET_Y + y, (px_t)pixel);
+    uint16_t logoOffsetX = (PIXELS_PER_LINE -LOGO_WIDTH) / 2;
 
-        pixel = (byte >> 4) & 0x3;
-        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 1), LOGO_OFFSET_Y + y, (px_t)pixel);
+    for (uint16_t x = 0; x < LOGO_WIDTH>>2; x++) {
+      uint8_t byte = logo_line_ptr[x];
+      uint8_t pixel;
+  
+      pixel = (byte >> 6) & 0x3;
+      video_draw_pixel((uint16_t)(logoOffsetX + (x<<2)), LOGO_OFFSET_Y + y, (px_t)colorMatrix[pixel]);
 
-        pixel = (byte >> 2) & 0x3;
-        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 2), LOGO_OFFSET_Y + y, (px_t)pixel);
+      pixel = (byte >> 4) & 0x3;
+      video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 1), LOGO_OFFSET_Y + y, (px_t)colorMatrix[pixel]);
 
-        pixel = byte & 0x3;
-        video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 3), LOGO_OFFSET_Y + y, (px_t)pixel);
-      }
+      pixel = (byte >> 2) & 0x3;
+      video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 2), LOGO_OFFSET_Y + y, (px_t)colorMatrix[pixel]);
+
+      pixel = byte & 0x3;
+      video_draw_pixel((uint16_t)(logoOffsetX + (x<<2) + 3), LOGO_OFFSET_Y + y, (px_t)colorMatrix[pixel]);
     }
+  }
+}
+
+void video_graphics_draw_test_pattern() {
+  video_draw_rectangle(50,  25, 75,  100, 0);
+  video_draw_rectangle(75,  25, 100, 100, 2);
+  video_draw_rectangle(100, 25, 125, 100, 3);
+  video_draw_rectangle(125, 25, 150, 100, 4);
+  video_draw_rectangle(150, 25, 175, 100, 5);
+  video_draw_rectangle(175, 25, 200, 100, 6);
+  video_draw_rectangle(200, 25, 225, 100, 7);
+  //video_draw_rectangle(225, 25, 250, 100, 3);
 }
 
 EXEC_RAM void video_graphics_draw_complete(void)
 {
-    if (show_logo)
+    if (show_test_pattern) {
+      video_graphics_draw_test_pattern();
+    } else if (show_logo) {
       video_graphics_draw_logo();
+    }
     active_video_buffer ^= 1;
     video_graphics_clear_draw_buff(PX_TRANSPARENT);
 }
@@ -379,6 +415,15 @@ void video_draw_line(int x0, int y0, int x1, int y1, px_t color)
         e2 = 2 * err;
         if (e2 >= dy) { err += dy; x0 += sx; }
         if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+}
+
+void video_draw_rectangle(int x0, int y0, int x1, int y1, px_t color)
+{
+    for (uint16_t y = y0; y<=y1; y++) {
+      for (uint16_t x = x0; x<=x1; x++) {
+        video_draw_pixel(x, y, color);
+      }
     }
 }
 

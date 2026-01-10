@@ -36,7 +36,7 @@ void logo_timeout_check(void);
 
 extern volatile uint16_t sync_voltage;
 extern uint16_t sync_voltage_low;
-extern uint16_t video_level[];
+extern uint16_t sync_levels[];
 extern double rf_detector;
 
 void debug_print_loop(void)
@@ -48,7 +48,7 @@ void debug_print_loop(void)
         TRACE_CMD(uint16_t rf_detect_int = rf_detector);
         TRACE_INFO("sync V:%i bl: %i sync low:%i adc_PA:%i adc_5V:%i\n",
           sync_voltage, 
-          (uint16_t)DAC12BIT_TO_MV(video_level[1] / VIDEO_TOTAL_GAIN), 
+          (uint16_t)DAC12BIT_TO_MV(sync_levels[1] / VIDEO_TOTAL_GAIN), 
           sync_voltage_low,
           rf_detect_int,
           adc_read_mv(ADC_CH_RESERVED) * 2); // Loop debug printf here

@@ -64,7 +64,11 @@ typedef enum {
   PX_BLACK = 0,
   PX_TRANSPARENT,
   PX_WHITE,
-  PX_GRAY
+  PX_GRAY,
+  PX_GREEN,
+  PX_RED,
+  PX_BLUE,
+  PX_YELLOW
 } px_t;
 
 // see adc.c - adc_init()

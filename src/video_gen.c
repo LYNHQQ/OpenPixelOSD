@@ -37,7 +37,7 @@
 #define HSYNC                 N_HSYNC, P_HSYNC
 #define HLSYNC                N_HSYNC, P_HLSYNC
 
-extern uint16_t video_level[];
+extern uint16_t sync_levels[];
 
 // Reverence timing, interlaced, progressive(non-interlaced) : https://martin.hinner.info/vga/pal.html
 #if INTERLACED_GEN
@@ -194,7 +194,7 @@ EXEC_RAM void video_gen_start(void)
         LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_6, GEN_BLANK_PAL_LINES);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_6);
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_5);
-        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_5, (uint32_t)&video_level);     
+        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_5, (uint32_t)&sync_levels);     
         LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_5, (uint32_t)&DAC3->DHR12R1);
         LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_5, 2);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_5);

@@ -34,6 +34,8 @@ uint8_t mspStickpos(void) {
 
 extern uint32_t phase_val[2][10];
 extern uint16_t triggerLine;
+extern uint16_t colorDelay;
+
 
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
@@ -124,16 +126,9 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
         case 9:
             {
               #if USE_COLOR == 1
-              static float phase;
-              phase = debug0;
+                colorDelay = debug0;
+                LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
 
-              //for ( uint8_t x = 0; x < 2; x++) {
-              //  phase_val[x][debug1] = (uint16_t)((720 + x * 360 - phase * (1 - x * 2) - 45 - (1 - x) * 90) / 360 * 1227) % 1227;
-              //}
-              
-              for ( uint8_t x = 0; x < 2; x++) {
-                phase_val[x][debug1] = (uint16_t)((360 + phase) / 360 * 1520) % 1520;
-              }
               #endif
 
             }

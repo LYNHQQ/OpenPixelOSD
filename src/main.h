@@ -57,7 +57,7 @@
 
 #define BLACK_LEVEL_ADC_DELAY_NS                3300
 #define LOW_SYNC_ADC_DELAY_NS                   6000
-#define COLOR_BURST_SYNC_GATE_CLOSE_NS          3000
+#define COLOR_BURST_SYNC_GATE_CLOSE_NS          2100
 #define VISIBLE_LINE_END_NS                     57000
 
 typedef enum {
@@ -146,6 +146,9 @@ typedef enum {
 #define USE_COLOR                0
 #endif
 
+#ifndef MAX
+#define MAX(a, b)  (((a) > (b)) ? (a) : (b))
+#endif
 
 void gpio_init(void);
 void adc_init(void);

@@ -35,6 +35,9 @@
 #define HRTIM_RELOAD_PAL    1227
 #define HRTIM_RELOAD_NTSC   1520
 
+#define COLOR_DELAY_PAL     25
+#define COLOR_DELAY_NTSC    39
+
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
 
 #define MAX_RENDER_LINE_PAL   (303)
@@ -45,15 +48,16 @@
 
 #define BITMASK(n)          ((1U << (n)) - 1U)
 
+
 const colorMap_t colorMap[][16] =  { 
                                     { {0.0f,    0},       // black
                                       {-1.0f,   100},     // transparent
                                       {0.0f,    700},     // white
                                       {0.0f,    245},     // grey 35%
                                       {240.7f,  440},     // green
-                                      {103.5f,  440},     // bright red
+                                      {103.5f,  350},     // bright red
                                       {347.1f,  150},     // bright blue
-                                      {167.1f,  660},     // yellow
+                                      {167.1f,  600},     // yellow
 
                                       {0.0f,      0},     // black
                                       {-1.0f,   100},     // transparent
@@ -96,6 +100,8 @@ static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase
 uint32_t phase_val[2][16] = {0};
 
 uint8_t palPhase = 0;
+uint16_t colorDelay = 0;
+float phaseOffset = 0;
 #endif
 
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
@@ -149,16 +155,15 @@ void set_color_system(videoMode_t mode)
     LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, HRTIM_RELOAD_NTSC);
     LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, HRTIM_RELOAD_NTSC);
     LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, HRTIM_RELOAD_NTSC);
-    LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, (HRTIM_RELOAD_NTSC + (523 - 400)) % HRTIM_RELOAD_NTSC);
-    LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (HRTIM_RELOAD_NTSC + (523 + 400)) % HRTIM_RELOAD_NTSC);
-
+    colorDelay = COLOR_DELAY_NTSC;
   } else {
     LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, HRTIM_RELOAD_PAL);
     LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, HRTIM_RELOAD_PAL);
     LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, HRTIM_RELOAD_PAL);
-    LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, (HRTIM_RELOAD_PAL + (623 - 400)) % HRTIM_RELOAD_PAL);
-    LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (HRTIM_RELOAD_PAL + (623 + 400)) % HRTIM_RELOAD_PAL);
+    colorDelay = COLOR_DELAY_PAL;
   }
+
+  LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
 }
 
 void set_color_phase(videoMode_t mode)
@@ -166,8 +171,8 @@ void set_color_phase(videoMode_t mode)
   if (mode == MODE_NTSC) {
     for (uint8_t x = 0; x<16; x++) {
       if (colorMap[colorMapIdx][x].phase > 0) {
-        phase_val[0][x] = (uint16_t)((360.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC;
-        phase_val[1][x] = (uint16_t)((360.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC;
+        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 625.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC);
+        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 625.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC);
       } else if (colorMap[colorMapIdx][x].phase == 0) {
         phase_val[0][x] = 0;
         phase_val[1][x] = 0;
@@ -180,8 +185,8 @@ void set_color_phase(videoMode_t mode)
   } else {
     for (uint8_t x = 0; x<16; x++) {
       if (colorMap[colorMapIdx][x].phase > 0) {
-        phase_val[0][x] = (uint16_t)((720 - colorMap[colorMapIdx][x].phase - 135) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL;
-        phase_val[1][x] = (uint16_t)((720 + colorMap[colorMapIdx][x].phase - 45 ) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL;
+        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 670.0f - colorMap[colorMapIdx][x].phase - 135.0f) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
+        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 670.0f + colorMap[colorMapIdx][x].phase - 45.0f ) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
       } else if (colorMap[colorMapIdx][x].phase == 0) {
         phase_val[0][x] = 0;
         phase_val[1][x] = 0;
@@ -257,7 +262,6 @@ void set_video_mode(videoMode_t mode)
 static void show_version(void)
 {
     char str[COLUMN_SIZE];
-    uint32_t* buffer = (uint32_t*)&video_frame_buffer[active_video_buffer];
 
     sprintf(str, "MCU: %s", MCU_TYPE);
     uint8_t col = (COLUMN_SIZE - strlen(str)) / 2;
@@ -306,8 +310,6 @@ void video_overlay_init(void)
 
     LL_COMP_Enable(COMP2);
     LL_COMP_Enable(COMP3);
-
-    //LL_TIM_EnableDMAReq_UPDATE(TIM1);
 
     LL_TIM_EnableIT_CC2(TIM2);
     LL_TIM_EnableIT_CC3(TIM2);
@@ -672,7 +674,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
     #if USE_COLOR == 1
-    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][3]); // ! send previous buffer
+    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
     LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_8);
     #endif
@@ -720,7 +722,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
             LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP3);
             LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP3);
             // Open trigger gate for HRTIM TIMER B colorbust synchronisation
-            LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage_black) * videoInputs[activeVideoInput].gain);
+            LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage_black - 15) * videoInputs[activeVideoInput].gain);
             LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_EEV_1);
             #endif
           }
@@ -850,9 +852,9 @@ EXEC_RAM void TIM2_IRQHandler(void)
             syncState = SYNC_STATE_EXTERNAL;
 
           } else if (syncState == SYNC_STATE_EXTERNAL) {
-              LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
+              //LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
               pars_video_signal(TIM2->CCR2);
-              LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
+              //LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
 
               set_black_level(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           }
@@ -897,7 +899,7 @@ EXEC_RAM void TIM3_IRQHandler(void)
     if(LL_HRTIM_TIM_GetResetTrig(HRTIM1, LL_HRTIM_TIMER_B) == LL_HRTIM_RESETTRIG_EEV_1) {
       // Close trigger gate for HRTIM TIMER B colorbust synchronisation
       LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_NONE);
-      
+
       //Determine PAL phase
       if(LL_HRTIM_TIM_GetCapture1(HRTIM1, LL_HRTIM_TIMER_B) > (HRTIM_RELOAD_PAL / 2) ) {
         phase = 0;

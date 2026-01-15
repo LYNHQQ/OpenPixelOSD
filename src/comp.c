@@ -10,7 +10,7 @@ void COMP2_Init(void)
 
     //COMP_InitStruct.InputPlus = VIDEO_SYNC_COMP_IMPUT;
     COMP_InitStruct.InputMinus = LL_COMP_INPUT_MINUS_DAC3_CH2;
-    COMP_InitStruct.InputHysteresis = LL_COMP_HYSTERESIS_20MV;
+    COMP_InitStruct.InputHysteresis = LL_COMP_HYSTERESIS_30MV;
     COMP_InitStruct.OutputPolarity = LL_COMP_OUTPUTPOL_NONINVERTED;
     COMP_InitStruct.OutputBlankingSource = LL_COMP_BLANKINGSRC_NONE;
     LL_COMP_Init(COMP2, &COMP_InitStruct);

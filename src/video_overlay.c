@@ -48,6 +48,7 @@
 
 #define BITMASK(n)          ((1U << (n)) - 1U)
 
+#define CCM_SRAM_OFFSET     0x10018000
 
 const colorMap_t colorMap[][16] =  { 
                                     { {0.0f,    0},       // black
@@ -88,7 +89,7 @@ static uint8_t sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
 uint16_t minRenderLine = 14;
 uint16_t maxRenderLine = 0;
 
-videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
+const videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
                                 {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
 uint8_t activeVideoInput;
 
@@ -96,8 +97,8 @@ static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel 
 static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
 #if USE_COLOR == 1
-static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
-uint32_t phase_val[2][16] = {0};
+CCMRAM_BSS static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
+CCMRAM_BSS uint32_t phase_val[2][16] = {0};
 
 uint8_t palPhase = 0;
 uint16_t colorDelay = 0;
@@ -106,7 +107,6 @@ float phaseOffset = 0;
 
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
 CCMRAM_DATA static uint32_t video_source;
-extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
 CCMRAM_DATA bool show_logo = true;
 CCMRAM_DATA bool show_test_pattern = false;
@@ -115,6 +115,8 @@ CCMRAM_BSS bool new_field = false;
 #if defined(HIGH_RAM)
 extern uint8_t active_video_buffer;
 extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
+#else
+extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 #endif
 
 #ifdef TRIGGER_LINE
@@ -265,9 +267,9 @@ static void show_version(void)
 
     sprintf(str, "MCU: %s", MCU_TYPE);
     uint8_t col = (COLUMN_SIZE - strlen(str)) / 2;
-    canvas_char_write(col, 10, str, strlen(str));
+    canvas_char_write(col, 10, str, strlen(str), 0);
     sprintf(str, "FW: %s", FW_VERSION);
-    canvas_char_write(col, 9, str, strlen(str));
+    canvas_char_write(col, 9, str, strlen(str), 0);
     canvas_char_draw_complete();
 }
 
@@ -562,7 +564,7 @@ EXEC_RAM void render_video_line(uint16_t line)
         IF_USE_COLOR(phase_buff[buf_idx][i] = phase[1]);
       }
     } else {
-      uint8_t *line_ptr = video_frame_buffer[!active_video_buffer][line - minRenderLine];
+      uint8_t *line_ptr = video_frame_buffer[active_video_buffer][line - minRenderLine];
 
       uint32_t buf_idx_local = 0;
       uint32_t word;
@@ -674,7 +676,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
     #if USE_COLOR == 1
-    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
+    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03] + CCM_SRAM_OFFSET); // ! send previous buffer
     LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
     LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_8);
     #endif
@@ -864,10 +866,12 @@ EXEC_RAM void TIM2_IRQHandler(void)
 
     if (LL_TIM_IsActiveFlag_CC3(TIM2)) {
       // Stop pixel output
-      LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
-      LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-      LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_8);
-      OPAMP1->CSR = video_source;
+      if(syncState == SYNC_STATE_EXTERNAL) {
+        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
+        LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
+        LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_8);
+        OPAMP1->CSR = video_source;
+      }
       
       #if USE_COLOR == 1
       if(syncState == SYNC_STATE_EXTERNAL) {

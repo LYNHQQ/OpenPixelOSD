@@ -206,6 +206,9 @@ EXEC_RAM void video_gen_start(void)
         LL_TIM_EnableDMAReq_CC1(TIM17);
         LL_TIM_EnableDMAReq_UPDATE(TIM17);
 
+        LL_TIM_DisableIT_CC1(TIM3);
+        LL_TIM_DisableIT_UPDATE(TIM3);
+
         video_gen_enabled = true;
     }
 }
@@ -221,6 +224,9 @@ EXEC_RAM void video_gen_stop(void)
         LL_TIM_DisableDMAReq_UPDATE(TIM17);
         LL_TIM_DisableCounter(TIM15);
         LL_TIM_SetTriggerInput(TIM15, LL_TIM_TS_ITR1);
+
+        LL_TIM_EnableIT_CC1(TIM3);
+        LL_TIM_EnableIT_UPDATE(TIM3);
 
         video_gen_enabled = false;
 

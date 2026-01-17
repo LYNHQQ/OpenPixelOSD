@@ -26,7 +26,6 @@ typedef enum {
     MSP_DISPLAYPORT_FONTCHAR_WRITE
 } msp_displayport_cmd_t;
 
-extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
 extern uint8_t paint_buffer;
 extern bool show_logo;
@@ -76,9 +75,11 @@ EXEC_RAM bool msp_displayport_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16
                 if (data_size < 5) break;
                 uint8_t row = payload[1];
                 uint8_t col = payload[2];
+                uint8_t attribute = payload[3];
+
                 if (row >= ROW_SIZE || col >= COLUMN_SIZE) break;
                 uint8_t len = data_size - 4;
-                memcpy(&canvas_char_map[paint_buffer][row][col], (const char *)&payload[4], len);
+                canvas_char_write(col, row, (const char *)&payload[4], len, attribute & 0x03);
                 break;
 
             case MSP_DISPLAYPORT_DRAW_SCREEN: // 4 -> Draw Screen

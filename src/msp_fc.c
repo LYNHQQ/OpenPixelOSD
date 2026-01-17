@@ -12,6 +12,7 @@
 #include "rf_pa.h"
 #include "video_overlay.h"
 
+
 fc_t fc;
 uint8_t boxIdIdx = 0;
 
@@ -119,6 +120,11 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             #endif
             break;
         case 4:
+            {
+            char ch = debug0;
+            video_draw_char_at(ch, debug2, debug3, PX_YELLOW);
+            }
+            break;
         case 5:
         case 6:
         case 7:

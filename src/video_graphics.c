@@ -24,22 +24,20 @@
 
 #define LOGO_OFFSET_Y       (25)
 
-/* From canvas_char.c */
-extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
-extern uint8_t active_buffer;
-
 extern bool show_logo;
 extern bool show_test_pattern;
 
 uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 CCMRAM_DATA uint8_t active_video_buffer = 0;
+CCMRAM_DATA uint8_t paint_video_buffer = 1;
 
 void video_graphics_init(void)
 {
-    for(int active_video_buffer = 0; active_video_buffer < 1; active_video_buffer++) {
+    for(int active_video_buffer = 0; active_video_buffer < 2; active_video_buffer++) {
         video_graphics_clear_draw_buff(PX_TRANSPARENT);
     }
     active_video_buffer = 0;
+    paint_video_buffer = 1;
 }
 
 EXEC_RAM void video_graphics_clear_draw_buff(px_t color)
@@ -52,9 +50,11 @@ EXEC_RAM void video_graphics_clear_draw_buff(px_t color)
 
   uint8_t* buffer = (uint8_t*)pixel_byte;
 
+  paint_video_buffer = 1 - active_video_buffer;
+
   for(uint16_t y = 0 ; y < VIDEO_HEIGHT; y++) {
     for(uint16_t x = 0; x< VIDEO_BYTES_PER_LINE; x++ ) {
-      video_frame_buffer[active_video_buffer][y][x] = buffer[x % 3];
+      video_frame_buffer[paint_video_buffer][y][x] = buffer[x % 3];
     }
   }
   #else
@@ -63,7 +63,7 @@ EXEC_RAM void video_graphics_clear_draw_buff(px_t color)
                          ((color & 0x3) << 2) |
                          ((color & 0x3) << 0);
 
-  memset(video_frame_buffer[active_video_buffer], pixel_byte, sizeof(video_frame_buffer[active_video_buffer]));
+  memset(video_frame_buffer[paint_video_buffer], pixel_byte, sizeof(video_frame_buffer[paint_video_buffer]));
   #endif
 }
 
@@ -78,7 +78,7 @@ void video_draw_pixel(uint16_t x, uint16_t y, px_t color)
     uint32_t byte_index = bit_index >> 3;
     uint8_t  shift      = 7 - (bit_index & 7);
 
-    uint8_t *byte = &video_frame_buffer[active_video_buffer][y][byte_index];
+    uint8_t *byte = &video_frame_buffer[paint_video_buffer][y][byte_index];
 
     #if VIDEO_BPP == 3
     if (shift + 1U >= VIDEO_BPP) {
@@ -110,7 +110,7 @@ void video_draw_pixel(uint16_t x, uint16_t y, px_t color)
 EXEC_RAM static inline void vg_put_px2(uint16_t x, uint16_t y, uint8_t v2)
 {
     if (x >= VIDEO_WIDTH || y >= VIDEO_HEIGHT) return;
-    uint8_t *line = &video_frame_buffer[active_video_buffer][y][0];
+    uint8_t *line = &video_frame_buffer[paint_video_buffer][y][0];
     uint16_t byte = x >> 2;                 /* 4 pixels per byte */
     uint8_t  sub  = x & 0x3;                /* 0..3 */
     uint8_t  shift = (uint8_t)((3u - sub) * 2u);
@@ -118,54 +118,44 @@ EXEC_RAM static inline void vg_put_px2(uint16_t x, uint16_t y, uint8_t v2)
     line[byte] = (uint8_t)((line[byte] & ~mask) | ((v2 & 0x3u) << shift));
 }
 
-EXEC_RAM void video_render_canvas_from_map(void)
+
+EXEC_RAM void video_draw_char_at(char ch, uint16_t x, uint16_t y, px_t color)
 {
-    /* Clear video frame buffer before rendering */
-    video_graphics_clear_draw_buff(PX_TRANSPARENT);
+    /* Pointer auf Glyph-Daten */
+    const uint8_t *glyph = &font_data[(uint8_t)ch * FONT_STRIDE];
+    uint8_t colorMatrix[] = {0,1,color,4};
 
-    /* Iterate over all rows of characters in the canvas */
-    for (uint16_t map_row = 0; map_row < ROW_SIZE; map_row++) {
+    /* Jede Zeile des Zeichens durchlaufen */
+    for (uint16_t glyph_row = 0; glyph_row < FONT_HEIGHT; glyph_row++) {
 
-        /* Iterate over all scan lines of the glyph */
-        for (uint16_t glyph_row = 0; glyph_row < FONT_HEIGHT; glyph_row++) {
+        uint16_t dst_y = y + glyph_row;
+        if (dst_y >= VIDEO_HEIGHT) continue;
 
-            uint16_t dst_y = (uint16_t)(map_row * FONT_HEIGHT + glyph_row);
-            if (dst_y >= VIDEO_HEIGHT) continue;
+        /* Offset der aktuellen Glyphen-Zeile */
+        uint32_t row_off = (uint32_t)glyph_row * (uint32_t)BYTES_PER_ROW;
 
-            /* Iterate over all character columns */
-            for (uint16_t col = 0; col < COLUMN_SIZE; col++) {
+        /* Jede Spalte (Pixel) der Glyphenbreite */
+        for (uint16_t gx = 0; gx < FONT_WIDTH; gx++) {
 
-                /* Get character code from canvas map buffer */
-                char ch = canvas_char_map[active_buffer][map_row][col];
+            uint16_t dst_x = x + gx;
+            if (dst_x >= VIDEO_WIDTH) continue;
 
-                /* Pointer to glyph data in font_data */
-                const uint8_t *glyph = &font_data[(uint8_t)ch * FONT_STRIDE];
+            /* Bitposition des Pixels im Glyph-Datenblock */
+            uint32_t bitpos     = (uint32_t)gx * (uint32_t)FONT_BPP;
+            uint32_t byte_index = row_off + (bitpos >> 3);
+            uint32_t bit_offset = bitpos & 0x7;
 
-                /* Offset to the current scanline within the glyph */
-                const uint32_t row_off = (uint32_t)glyph_row * (uint32_t)BYTES_PER_ROW;
+            uint8_t raw_byte = glyph[byte_index];
 
-                uint16_t dst_x = (uint16_t)(col * FONT_WIDTH);
-                if (dst_x >= VIDEO_WIDTH) continue;
+            /* 2-Bit-Pixel extrahieren (MSB-first) */
+            uint8_t px2 = (uint8_t)((raw_byte >> (6 - bit_offset)) & 0x03u);
 
-                /* Iterate over all pixels of the glyph width */
-                for (uint16_t gx = 0; gx < FONT_WIDTH; gx++) {
-
-                    /* Bit position of this pixel in the glyph data */
-                    uint32_t bitpos     = (uint32_t)gx * (uint32_t)FONT_BPP;
-                    uint32_t byte_index = row_off + (bitpos >> 3);
-                    uint32_t bit_offset = bitpos & 0x7;
-                    uint8_t raw_byte    = glyph[byte_index];
-
-                    /* Extract 2-bit pixel (MSB-first order) */
-                    uint8_t px2 = (uint8_t)((raw_byte >> (6 - bit_offset)) & 0x03u);
-
-                    video_draw_pixel((uint16_t)(dst_x + gx), dst_y, (px_t)px2);
-                }
-            }
+            /* Pixel in den Video-Buffer schreiben */
+            video_draw_pixel(dst_x, dst_y, (px_t)colorMatrix[px2]);
         }
     }
-    video_graphics_draw_complete();
 }
+
 
 void video_graphics_draw_logo()
 {
@@ -217,8 +207,8 @@ EXEC_RAM void video_graphics_draw_complete(void)
     } else if (show_logo) {
       video_graphics_draw_logo();
     }
-    active_video_buffer ^= 1;
-    video_graphics_clear_draw_buff(PX_TRANSPARENT);
+    active_video_buffer = paint_video_buffer;
+    //video_graphics_clear_draw_buff(PX_TRANSPARENT);
 }
 
 EXEC_RAM inline bool bit_at(const uint8_t *glyph, uint8_t gx, uint8_t gy, uint8_t BPR) {

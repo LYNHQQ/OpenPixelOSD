@@ -35,7 +35,7 @@
 #define HRTIM_RELOAD_PAL    1227
 #define HRTIM_RELOAD_NTSC   1520
 
-#define COLOR_DELAY_PAL     25
+#define COLOR_DELAY_PAL     49
 #define COLOR_DELAY_NTSC    39
 
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
@@ -56,9 +56,9 @@ const colorMap_t colorMap[][16] =  {
                                       {0.0f,    700},     // white
                                       {0.0f,    245},     // grey 35%
                                       {240.7f,  440},     // green
-                                      {103.5f,  350},     // bright red
+                                      {103.5f,  400},     // bright red
                                       {347.1f,  150},     // bright blue
-                                      {167.1f,  600},     // yellow
+                                      {167.1f,  620},     // yellow
 
                                       {0.0f,      0},     // black
                                       {-1.0f,   100},     // transparent
@@ -255,10 +255,6 @@ void set_video_mode(videoMode_t mode)
     maxRenderLine = MAX_RENDER_LINE_PAL;
   }
 
-  #if USE_COLOR == 1
-  set_color_system(videoMode);
-  set_color_phase(videoMode);
-  #endif
 }
 
 static void show_version(void)
@@ -659,7 +655,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
     LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
     #if USE_COLOR == 1
-    LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_8);
+    LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
     #endif
 
     // Configure length and addresses
@@ -676,13 +672,16 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
     #if USE_COLOR == 1
-    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03] + CCM_SRAM_OFFSET); // ! send previous buffer
-    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
-    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_8);
+    if(syncState == SYNC_STATE_EXTERNAL) {
+      LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03] + CCM_SRAM_OFFSET); // ! send previous buffer
+      LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
+      LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
+    }
     #endif
 
     LL_TIM_EnableDMAReq_UPDATE(TIM1);
     LL_TIM_EnableDMAReq_CC1(TIM1);
+    LL_TIM_EnableDMAReq_CC2(TIM1);
 
 
 #if defined(HIGH_RAM)
@@ -850,6 +849,11 @@ EXEC_RAM void TIM2_IRQHandler(void)
             if (video_gen_enabled == true) {
                 video_gen_stop();
             }
+            TRACE_INFO("Sync found\n");
+            #if USE_COLOR == 1
+            set_color_system(videoMode);
+            set_color_phase(videoMode);
+            #endif
             set_video_source(videoInputs[activeVideoInput].opampInput);
             syncState = SYNC_STATE_EXTERNAL;
 
@@ -869,7 +873,7 @@ EXEC_RAM void TIM2_IRQHandler(void)
       if(syncState == SYNC_STATE_EXTERNAL) {
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
         LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-        LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_8);
+        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
         OPAMP1->CSR = video_source;
       }
       

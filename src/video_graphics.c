@@ -63,6 +63,8 @@ EXEC_RAM void video_graphics_clear_draw_buff(px_t color)
                          ((color & 0x3) << 2) |
                          ((color & 0x3) << 0);
 
+  paint_video_buffer = 1 - active_video_buffer;
+
   memset(video_frame_buffer[paint_video_buffer], pixel_byte, sizeof(video_frame_buffer[paint_video_buffer]));
   #endif
 }

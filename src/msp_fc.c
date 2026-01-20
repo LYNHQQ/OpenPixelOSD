@@ -33,12 +33,15 @@ uint8_t mspStickpos(void) {
   return result;
 }
 
-extern uint32_t phase_val[2][10];
 extern uint16_t triggerLine;
-extern uint16_t colorDelay;
-set_color_phase(videoMode_t mode);
 extern videoMode_t videoMode;
+
+#if USE_COLOR == 1
+extern uint32_t phase_val[2][10];
 extern float phaseOffset;
+void set_color_phase(videoMode_t mode);
+extern uint16_t colorDelay;
+#endif
 
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
@@ -122,18 +125,7 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             #endif
             break;
         case 4:
-            {
-            char ch = debug0;
-            video_draw_char_at(ch, debug2, debug3, PX_YELLOW);
-            }
-            break;
         case 5:
-            {
-              phaseOffset = debug0 / 10.0f;
-
-              set_color_phase(videoMode);
-            }
-            break;
         case 6:
             LL_TIM_OC_SetCompareCH2(TIM1, debug0);
             break;
@@ -145,8 +137,9 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
                 colorDelay = debug0;
                 LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
 
+                phaseOffset = debug2 / 10.0f;
+                set_color_phase(videoMode);
               #endif
-
             }
             break;
         default:

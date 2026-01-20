@@ -40,7 +40,7 @@
 
 // Video input 2 PA7
 #define VIDEO2_INPUT_ENABLED                    true
-#define VIDEO2_INPUT_GAIN                       2
+#define VIDEO2_INPUT_GAIN                       1
 
 
 #define USE_COLOR                               1

@@ -213,7 +213,7 @@ EXEC_RAM void video_graphics_draw_complete(void)
     //video_graphics_clear_draw_buff(PX_TRANSPARENT);
 }
 
-EXEC_RAM inline bool bit_at(const uint8_t *glyph, uint8_t gx, uint8_t gy, uint8_t BPR) {
+EXEC_RAM bool bit_at(const uint8_t *glyph, uint8_t gx, uint8_t gy, uint8_t BPR) {
     const uint8_t *row = glyph + (uint32_t)gy * BPR;
     /* MSB-first within each byte */
     uint8_t byte = row[gx >> 3];

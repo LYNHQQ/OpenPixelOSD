@@ -48,7 +48,6 @@
 
 #define BITMASK(n)          ((1U << (n)) - 1U)
 
-#define CCM_SRAM_OFFSET     0x10018000
 
 const colorMap_t colorMap[][16] =  { 
                                     { {0.0f,    0},       // black
@@ -97,8 +96,8 @@ static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel 
 static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
 #if USE_COLOR == 1
-CCMRAM_BSS static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
-CCMRAM_BSS uint32_t phase_val[2][16] = {0};
+static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
+uint32_t phase_val[2][16] = {0};
 
 uint8_t palPhase = 0;
 uint16_t colorDelay = 0;
@@ -442,13 +441,13 @@ EXEC_RAM static void render_line(uint16_t line)
     if (line < minRenderLine || map_row >= ROW_SIZE) {
         // Out of screen — just transparent
         for (i = 0; i < LINE_BUF_SZ; i++) {
-            dac_buff[line_parity][i] = video_level[1];
+            dac_buff[line_parity][i] = video_levels[1];
             opamp_buff[line_parity][i] = video_source;
         }
         return;
     }
 
-    dac_buff[line_parity][0] = video_level[1];
+    dac_buff[line_parity][0] = video_levels[1];
     opamp_buff[line_parity][0] = video_source;
 
     // Render each character of the map
@@ -673,7 +672,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
 
     #if USE_COLOR == 1
     if(syncState == SYNC_STATE_EXTERNAL) {
-      LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03] + CCM_SRAM_OFFSET); // ! send previous buffer
+      LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
       LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
       LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
     }
@@ -873,7 +872,9 @@ EXEC_RAM void TIM2_IRQHandler(void)
       if(syncState == SYNC_STATE_EXTERNAL) {
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
         LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
+        #if USE_COLOR == 1
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
+        #endif
         OPAMP1->CSR = video_source;
       }
       

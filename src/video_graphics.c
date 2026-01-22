@@ -192,14 +192,29 @@ void video_graphics_draw_logo()
 }
 
 void video_graphics_draw_test_pattern() {
-  video_draw_rectangle(50,  25, 75,  100, 0);
-  video_draw_rectangle(75,  25, 100, 100, 2);
-  video_draw_rectangle(100, 25, 125, 100, 3);
-  video_draw_rectangle(125, 25, 150, 100, 4);
-  video_draw_rectangle(150, 25, 175, 100, 5);
-  video_draw_rectangle(175, 25, 200, 100, 6);
-  video_draw_rectangle(200, 25, 225, 100, 7);
+  video_draw_rectangle(50,  25, 75,  75, 0);
+  video_draw_rectangle(75,  25, 100, 75, 2);
+  video_draw_rectangle(100, 25, 125, 75, 3);
+  video_draw_rectangle(125, 25, 150, 75, 4);
+  video_draw_rectangle(150, 25, 175, 75, 5);
+  video_draw_rectangle(175, 25, 200, 75, 6);
+  video_draw_rectangle(200, 25, 225, 75, 7);
   //video_draw_rectangle(225, 25, 250, 100, 3);
+
+  video_draw_rectangle(10,  150, 350,  200, PX_BLACK);
+  video_draw_rectangle(10,  225, 350,  250, PX_WHITE);
+  for(uint8_t x=0; x<5; x++) {
+    video_draw_rectangle(30  + x * 10, 125, 35  + x * 10,  250, PX_WHITE);
+    video_draw_rectangle(80  + x * 10, 125, 85  + x * 10,  150, PX_WHITE);
+    video_draw_rectangle(130 + x * 10, 125, 135 + x * 10,  150, PX_WHITE);
+    video_draw_rectangle(180 + x * 10, 125, 185 + x * 10,  150, PX_WHITE);
+    video_draw_rectangle(230 + x * 10, 125, 235 + x * 10,  150, PX_WHITE);
+    video_draw_rectangle(80  + x * 10, 150, 85  + x * 10,  250, PX_YELLOW);
+    video_draw_rectangle(130 + x * 10, 150, 135 + x * 10,  250, PX_GREEN);
+    video_draw_rectangle(180 + x * 10, 150, 185 + x * 10,  250, PX_RED);
+    video_draw_rectangle(230 + x * 10, 150, 235 + x * 10,  250, PX_BLUE);
+    
+  }
 }
 
 EXEC_RAM void video_graphics_draw_complete(void)

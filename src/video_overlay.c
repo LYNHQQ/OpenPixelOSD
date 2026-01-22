@@ -35,7 +35,7 @@
 #define HRTIM_RELOAD_PAL    1227
 #define HRTIM_RELOAD_NTSC   1520
 
-#define COLOR_DELAY_PAL     49
+#define COLOR_DELAY_PAL     44
 #define COLOR_DELAY_NTSC    39
 
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)

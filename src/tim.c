@@ -58,7 +58,7 @@ void TIM1_Init(void)
     TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM1;
     TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
     TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
-    TIM_OC_InitStruct.CompareValue = 16;
+    TIM_OC_InitStruct.CompareValue = 17;
     TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;
     TIM_OC_InitStruct.OCNPolarity = LL_TIM_OCPOLARITY_HIGH;
     TIM_OC_InitStruct.OCIdleState = LL_TIM_OCIDLESTATE_LOW;
@@ -401,7 +401,7 @@ void HRTIM1_Init(void)
   LL_HRTIM_TIM_DisablePreload(HRTIM1, LL_HRTIM_TIMER_A);
   LL_HRTIM_TIM_EnableResyncUpdate(HRTIM1, LL_HRTIM_TIMER_A);
   LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, 32);
-  LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, 600);
+  LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, 700);
 
   LL_HRTIM_ForceUpdate(HRTIM1, LL_HRTIM_TIMER_A);
   LL_HRTIM_TIM_CounterEnable(HRTIM1, LL_HRTIM_TIMER_A);

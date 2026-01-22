@@ -131,6 +131,8 @@ typedef enum {
 
 #if defined(TARGET_PIXELVTX)
 #include "targets\pixelVTX.h"
+#elif defined(TARGET_PIXELVTX_COLOR)
+#include "targets\pixelVTXcolor.h"
 #else
 #include "targets\generic.h"
 #endif

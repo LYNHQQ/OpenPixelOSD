@@ -63,7 +63,7 @@ __eeprom_size = 0x1000;
 /* Specify the memory areas */
 MEMORY
 {
-  RAM (xrw)           : ORIGIN = 0x20000000, LENGTH = 128K
+  RAM (xrw)           : ORIGIN = 0x20000000, LENGTH = 96K
   FLASH (rx)          : ORIGIN = 0x08000000, LENGTH = 0x80000 - 0x4000 - 0x2000 - 0x4000 /* 512K - 4K - 16K - 8K - 16K = 468K */
   FLASH_SYS_FONT (rx) : ORIGIN = 0x08000000 + (0x80000 - __eeprom_size - 0x4000 - 0x2000 - 0x4000), LENGTH = 0x4000 /* 16K */
   FLASH_LOGO (rx)     : ORIGIN = 0x08000000 + (0x80000 - __eeprom_size - 0x4000 - 0x2000), LENGTH = 0x2000 /* 8K */
@@ -204,7 +204,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
+  } >CCMRAM
 
   /* === Separate section for the font, aligned to 4 bytes === */
   .system_font :

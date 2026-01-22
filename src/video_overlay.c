@@ -10,11 +10,11 @@
 #include "main.h"
 #include "settings.h"
 #include "video_gen.h"
-#include "logo/logo.h"
 #include "canvas_char.h"
 #include "video_graphics.h"
 #if defined(LOW_RAM)
 #include "fonts/font_bf_default.h"
+#include "logo/logo.h"
 #endif
 
 #define TIM2_TICK_MS        (1e6f / 170000000)
@@ -24,34 +24,57 @@
 #define OPAMP_CONST_IO1     ((VIDEO_TOTAL_GAIN / VIDEO1_INPUT_GAIN) == 1 ? 0x108000E5U : 0x108000C5U)  // Positive Input IO1 (e.g., PA3) - video generator input
 #define OPAMP_CONST_IO2     ((VIDEO_TOTAL_GAIN / VIDEO2_INPUT_GAIN) == 1 ? 0x108000E9U : 0x108000C9U)  // Positive Input IO2 (e.g., PA7) - video input form camera
 
-#define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC)
+#define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC) Follower mode
+#define OPAMP_CONST_DAC_MOD 0x108200CDU  // Positive Input DAC1_OUT1 (internal DAC) non inverting gain =2 with VINM0 pin for input or bias
 
-#define OFFSET_Y            (16)
-#define LINE_BUF_SZ         (PIXELS_PER_LINE+1)
+#define LINE_BUF_SZ         (PIXELS_PER_LINE+2)
 
 #define OFFSET_SYNC         300
-#define OFFSET_TRANSPARENT  100
-#define OFFSET_WHITE        700
-#define OFFSET_GREY         250
+#define OFFSET_COLOR_LUM    100
+
+#define HRTIM_RELOAD_PAL    1227
+#define HRTIM_RELOAD_NTSC   1520
+
+#define COLOR_DELAY_PAL     44
+#define COLOR_DELAY_NTSC    39
 
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
-#define DAC_WHITE           (DAC_BLACK + DAC12BIT_FROM_MV(OFFSET_WHITE))
-#define DAC_GRAY            (DAC_BLACK + DAC12BIT_FROM_MV(OFFSET_GREY))
-#define DAC_SYNC            (DAC_BLACK - DAC12BIT_FROM_MV(OFFSET_SYNC))
 
-#define MAX_RENDER_LINE     (303) // for PAL
+#define MAX_RENDER_LINE_PAL   (303)
+#define MAX_RENDER_LINE_NTSC  (250)
 
 #define LOGO_OFFSET_X       (90)
 #define LOGO_OFFSET_Y       (25)
 
-uint32_t opa_val[8] = { OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, OPAMP_CONST_DAC, 
-                        OPAMP_CONST_IO0, OPAMP_CONST_IO0, OPAMP_CONST_IO0, OPAMP_CONST_IO0  };
+#define BITMASK(n)          ((1U << (n)) - 1U)
 
-uint16_t video_level[9] = { DAC_SYNC, DAC_BLACK, DAC_BLACK, DAC_WHITE, DAC_GRAY,
-                                      DAC_BLACK, DAC_GRAY, DAC_WHITE, DAC_GRAY};
 
-uint16_t* video_levels = &video_level[1];
-uint32_t* opa_vals = &opa_val[0];
+const colorMap_t colorMap[][16] =  { 
+                                    { {0.0f,    0},       // black
+                                      {-1.0f,   100},     // transparent
+                                      {0.0f,    700},     // white
+                                      {0.0f,    245},     // grey 35%
+                                      {240.7f,  440},     // green
+                                      {103.5f,  400},     // bright red
+                                      {347.1f,  150},     // bright blue
+                                      {167.1f,  620},     // yellow
+
+                                      {0.0f,      0},     // black
+                                      {-1.0f,   100},     // transparent
+                                      {167.1f,  660},     // yellow
+                                      {283.5f,  520},     // cyan
+                                      {240.7f,  440},     // green
+                                      { 60.7f,  300},     // magenta
+                                      {103.5f,  220},     // red
+                                      {347.1f,  100} }    // blue
+                                  };
+
+uint8_t colorMapIdx = 0;
+
+uint32_t opa_vals[16] = {OPAMP_CONST_DAC};
+uint16_t video_levels[16] = {0};
+
+uint16_t sync_levels[2] = {0};
 
 uint8_t frame_counter = 0;
 syncMode_t syncMode = OFF;
@@ -62,17 +85,27 @@ uint16_t sync_voltage_black = SYNC_START_MV;
 uint16_t sync_voltage_low = 0;
 osdState_e osdState = OSD_INIT;
 static uint8_t sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
+uint16_t minRenderLine = 14;
+uint16_t maxRenderLine = 0;
 
-videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
+const videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
                                 {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
 uint8_t activeVideoInput;
 
-static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORLD/WORLD
-static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORLD/WORLD
+static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
+static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
+
+#if USE_COLOR == 1
+static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
+uint32_t phase_val[2][16] = {0};
+
+uint8_t palPhase = 0;
+uint16_t colorDelay = 0;
+float phaseOffset = 0;
+#endif
+
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
 CCMRAM_DATA static uint32_t video_source;
-extern volatile bool video_gen_enabled;
-extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 extern uint8_t active_buffer;
 CCMRAM_DATA bool show_logo = true;
 CCMRAM_DATA bool show_test_pattern = false;
@@ -81,19 +114,28 @@ CCMRAM_BSS bool new_field = false;
 #if defined(HIGH_RAM)
 extern uint8_t active_video_buffer;
 extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
+#else
+extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
+#endif
+
+#ifdef TRIGGER_LINE
+uint16_t triggerLine = TRIGGER_LINE;
 #endif
 
 EXEC_RAM static void set_black_level(uint32_t new_level)
 {
   if (new_level > DAC12BIT_FROM_MV(OFFSET_SYNC))
-    video_level[0] = (new_level - DAC12BIT_FROM_MV(OFFSET_SYNC)) * VIDEO_TOTAL_GAIN;
+    sync_levels[0] = (new_level - DAC12BIT_FROM_MV(OFFSET_SYNC)) * VIDEO_TOTAL_GAIN;
   else
-    video_level[0] = 0;
+    sync_levels[0] = 0;
+  sync_levels[1] = new_level * VIDEO_TOTAL_GAIN;
 
-  video_level[1] = new_level * VIDEO_TOTAL_GAIN;
-  video_level[2] = (new_level + DAC12BIT_FROM_MV(OFFSET_TRANSPARENT)) * VIDEO_TOTAL_GAIN;
-  video_level[3] = (new_level + DAC12BIT_FROM_MV(OFFSET_WHITE)) * VIDEO_TOTAL_GAIN;
-  video_level[4] = (new_level + DAC12BIT_FROM_MV(OFFSET_GREY)) * VIDEO_TOTAL_GAIN;
+  for (uint8_t x = 0; x<16; x++) {
+    if (colorMap[colorMapIdx][x].phase > 0 && !video_gen_enabled) 
+      video_levels[x] = new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance + OFFSET_COLOR_LUM);
+    else
+      video_levels[x] = (new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance)) * VIDEO_TOTAL_GAIN;  
+  } 
 
 #ifdef ALPHA_CHANNEL
   video_level[5] = new_level;
@@ -106,21 +148,82 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
 #endif
 }
 
+#if USE_COLOR == 1
+
+void set_color_system(videoMode_t mode)
+{
+  if (mode == MODE_NTSC) {
+    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, HRTIM_RELOAD_NTSC);
+    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, HRTIM_RELOAD_NTSC);
+    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, HRTIM_RELOAD_NTSC);
+    colorDelay = COLOR_DELAY_NTSC;
+  } else {
+    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, HRTIM_RELOAD_PAL);
+    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, HRTIM_RELOAD_PAL);
+    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, HRTIM_RELOAD_PAL);
+    colorDelay = COLOR_DELAY_PAL;
+  }
+
+  LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
+}
+
+void set_color_phase(videoMode_t mode)
+{
+  if (mode == MODE_NTSC) {
+    for (uint8_t x = 0; x<16; x++) {
+      if (colorMap[colorMapIdx][x].phase > 0) {
+        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 625.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC);
+        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 625.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC);
+      } else if (colorMap[colorMapIdx][x].phase == 0) {
+        phase_val[0][x] = 0;
+        phase_val[1][x] = 0;
+      } else {
+        phase_val[0][x] = 0;
+        phase_val[1][x] = 0;
+      }
+    }
+
+  } else {
+    for (uint8_t x = 0; x<16; x++) {
+      if (colorMap[colorMapIdx][x].phase > 0) {
+        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 670.0f - colorMap[colorMapIdx][x].phase - 135.0f) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
+        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 670.0f + colorMap[colorMapIdx][x].phase - 45.0f ) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
+      } else if (colorMap[colorMapIdx][x].phase == 0) {
+        phase_val[0][x] = 0;
+        phase_val[1][x] = 0;
+      } else {
+        phase_val[0][x] = 0;
+        phase_val[1][x] = 0;
+      }
+    }
+  }
+}
+#endif
+
 EXEC_RAM static void init_buffers()
 {
     for (uint32_t j = 0; j < LINE_BUF_SZ; j++) {
-        dac_buff[0][j] = DAC_GRAY;
+        dac_buff[0][j] = DAC_BLACK;
         opamp_buff[0][j] = video_source;
-        dac_buff[1][j] = DAC_GRAY;
+        IF_USE_COLOR(phase_buff[0][j] = 0);
+        dac_buff[1][j] = DAC_BLACK;
         opamp_buff[1][j] = video_source;
+        IF_USE_COLOR(phase_buff[1][j] = 0);
     }
 }
 
 EXEC_RAM static void set_video_source(uint32_t source)
 {
   video_source = source;
-  opa_val[1] = source;
-  opa_val[5] = source;
+  for (uint8_t x = 0; x<16; x++) {
+    if (colorMap[colorMapIdx][x].phase < 0) {
+      opa_vals[x] = video_source;
+    } else if (colorMap[colorMapIdx][x].phase > 0 && !video_gen_enabled) {
+      opa_vals[x] = OPAMP_CONST_DAC_MOD;
+    } else {
+      opa_vals[x] = OPAMP_CONST_DAC;
+    }
+  }
   OPAMP1->CSR = source;
 }
 
@@ -137,15 +240,31 @@ void set_video_input(uint8_t input)
   LL_COMP_SetInputPlus(COMP2, videoInputs[activeVideoInput].compInput);
 }
 
+void set_video_mode(videoMode_t mode)
+{
+  videoMode = mode;
+
+  if(mode == MODE_NTSC) {
+    TRACE_INFO_WP("videoMode NTSC\n");
+    minRenderLine = 14;
+    maxRenderLine = MAX_RENDER_LINE_NTSC;
+  } else {
+    TRACE_INFO_WP("videoMode PAL\n");
+    minRenderLine = 14;
+    maxRenderLine = MAX_RENDER_LINE_PAL;
+  }
+
+}
+
 static void show_version(void)
 {
     char str[COLUMN_SIZE];
-    
+
     sprintf(str, "MCU: %s", MCU_TYPE);
     uint8_t col = (COLUMN_SIZE - strlen(str)) / 2;
-    canvas_char_write(col, 10, str, strlen(str));
+    canvas_char_write(col, 10, str, strlen(str), 0);
     sprintf(str, "FW: %s", FW_VERSION);
-    canvas_char_write(col, 9, str, strlen(str));
+    canvas_char_write(col, 9, str, strlen(str), 0);
     canvas_char_draw_complete();
 }
 
@@ -163,23 +282,34 @@ void video_overlay_init(void)
     OPAMP1_Init(); // OPAMP1 as multiplexer for video source selection
     TIM1_Init(); // TIM1 for video line generation
     TIM2_Init(); // TIM2 detect HSYNC VSYNC video input
+    
     TIM15_Init(); // TIM15 delay for video line generation start
     TIM17_Init(); // TIM17 for video generator
     COMP2_Init(); // COMP2 for video sync detection
-    //COMP3_Init(); // COMP3 for video sync detection
     
+
+#if USE_COLOR == 1
+    TIM3_Init();
+    HRTIM1_Init();
+
+    LL_TIM_EnableIT_CC1(TIM3);
+    LL_TIM_EnableIT_UPDATE(TIM3);
+    LL_TIM_EnableCounter(TIM3);
+    LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1);
+#endif
+
 #if defined(ALPHA_CHANNEL) && defined(STM32G474xx)
     OPAMP6_Init();
     LL_OPAMP_Enable(OPAMP6);
 #endif
 
     LL_OPAMP_Enable(OPAMP1);
-    LL_OPAMP_Enable(OPAMP3);
 
     LL_COMP_Enable(COMP2);
     LL_COMP_Enable(COMP3);
 
     LL_TIM_EnableIT_CC2(TIM2);
+    LL_TIM_EnableIT_CC3(TIM2);
     LL_TIM_EnableCounter(TIM2);
     LL_TIM_CC_EnableChannel(TIM2, LL_TIM_CHANNEL_CH2);
 
@@ -203,9 +333,11 @@ void video_overlay_init(void)
 #else
     set_video_input(settings.activeVideoInput);
 #endif
-    set_video_source(OPAMP_CONST_DAC);
-    set_black_level(DAC_BLACK);
+    
+    set_video_mode(MODE_PAL);
     video_gen_start();
+    set_black_level(DAC_BLACK);
+    set_video_source(OPAMP_CONST_DAC);
 
     if (settings.displayportEnabled) {     
       setSyncMode(AUTOMATIC);
@@ -227,7 +359,6 @@ void scan_sync_voltage() {
     LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
 }
 
-
 #if defined(LOW_RAM)
 EXEC_RAM static void squash_canvas_raw_pixel_buff(char c, uint32_t glyph_row, uint32_t x_off)
 {
@@ -248,11 +379,10 @@ EXEC_RAM static void squash_canvas_raw_pixel_buff(char c, uint32_t glyph_row, ui
     }
     opamp_buff[buf_idx][x_off + FONT_WIDTH] = video_source;
 }
-#endif
 
 void render_overlay_logo_line(uint16_t line)
 {
-    if (line >= MAX_RENDER_LINE) return;
+    if (line >= maxRenderLine) return;
 
     // Logo line considering vertical offset
     if (line < LOGO_OFFSET_Y || (line - LOGO_OFFSET_Y) >= LOGO_HEIGHT) {
@@ -290,36 +420,6 @@ void render_overlay_logo_line(uint16_t line)
     }
 }
 
-void render_test_pattern_line(uint16_t line)
-{
-    if (line >= MAX_RENDER_LINE) return;
-
-    // Logo line considering vertical offset
-    if (line < LOGO_OFFSET_Y || (line - LOGO_OFFSET_Y) >= LOGO_HEIGHT) {
-        // Line outside the logo area — do nothing, keep existing buffer contents
-        return;
-    }
-    uint8_t pattern = line / 18;
-    
-    for (uint16_t buf_index = 0; buf_index < LINE_BUF_SZ-12; buf_index += 12) {
-
-        px_t px = pattern++ & 0x03;
-
-        // If pixel is transparent — skip (keep existing buffer value)
-        if (px == PX_TRANSPARENT) {
-            continue;
-        }
-
-        // Overlay — overwrite only if pixel is not transparent
-        for (uint8_t x = 0; x < 12; x++) {
-          dac_buff[buf_idx][buf_index + x] = video_levels[px + 1];
-          opamp_buff[buf_idx][buf_index+ x] = opa_vals[px];
-        }
-        
-    }
-}
-
-#if defined(LOW_RAM)
 EXEC_RAM static void render_line(uint16_t line)
 {
     CCMRAM_BSS static uint32_t draw_line = 0;
@@ -330,8 +430,7 @@ EXEC_RAM static void render_line(uint16_t line)
     char c = 0;
 
     // Offset current draw line by Y_OFFSET
-    if (line < OFFSET_Y) return;
-    draw_line = line - OFFSET_Y;
+    draw_line = line - minRenderLine;
 
     // Calculate which character row and which row in the glyph
     map_row    = draw_line / FONT_HEIGHT;  // 0..ROW_SIZE-1
@@ -339,65 +438,206 @@ EXEC_RAM static void render_line(uint16_t line)
 
     line_parity = draw_line & 1;
 
-    if (map_row >= ROW_SIZE) {
+    if (line < minRenderLine || map_row >= ROW_SIZE) {
         // Out of screen — just transparent
         for (i = 0; i < LINE_BUF_SZ; i++) {
-            dac_buff[line_parity][i] = video_level[1];
+            dac_buff[line_parity][i] = video_levels[1];
             opamp_buff[line_parity][i] = video_source;
         }
         return;
     }
 
+    dac_buff[line_parity][0] = video_levels[1];
+    opamp_buff[line_parity][0] = video_source;
+
     // Render each character of the map
     for (i = 0; i < COLUMN_SIZE; i++) {
         c = canvas_char_map[active_buffer][map_row][i]; // draw previous char map buffer
-        squash_canvas_raw_pixel_buff(c, glyph_row, i * FONT_WIDTH);
+        squash_canvas_raw_pixel_buff(c, glyph_row, 1 + i * FONT_WIDTH);
     }
 
     opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
 }
 #endif
 
-#if defined(HIGH_RAM)
-
-EXEC_RAM void render_video_line(uint16_t line)
+void render_test_pattern_line(uint16_t line)
 {
-    CCMRAM_BSS static uint32_t draw_line = 0;
+    if (line >= 105) return;
 
-    draw_line = line - 1;
+    #if USE_COLOR == 1
+    uint32_t* phase;
+    phase = phase_val[palPhase];
+    #endif
 
-    uint8_t *line_ptr = video_frame_buffer[!active_video_buffer][draw_line];
-
-    if (draw_line >= VIDEO_HEIGHT) {
+    if (line < 50 || line >= 120) {
       for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
+        IF_USE_COLOR(phase_buff[buf_idx][i] = phase[1]);
         dac_buff[buf_idx][i] = video_levels[1];
         opamp_buff[buf_idx][i] = video_source;
       }
     } else {
+
+      uint16_t buf_index;
+
+      for (buf_index = 0; buf_index < 50; buf_index++ ) {
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[1]);
+        dac_buff[buf_idx][buf_index] = video_levels[1];
+        opamp_buff[buf_idx][buf_index] = video_source;
+        
+      }
+
+      for(uint8_t  y=4; y<8; y++) {
+        for (uint8_t i = 0; i<8 ; i++) {
+          IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[y]);
+          dac_buff[buf_idx][buf_index] = video_levels[y];
+          opamp_buff[buf_idx][buf_index++] = opa_vals[y];
+          
+          IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[y]);
+          dac_buff[buf_idx][buf_index] = video_levels[y];
+          opamp_buff[buf_idx][buf_index++] = opa_vals[y];
+
+          IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[y]);
+          dac_buff[buf_idx][buf_index] = video_levels[y];
+          opamp_buff[buf_idx][buf_index++] = opa_vals[y];
+
+          IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[y]);
+          dac_buff[buf_idx][buf_index] = video_levels[y];
+          opamp_buff[buf_idx][buf_index++] = opa_vals[y];
+        }
+      }
+
+      for (uint8_t i = 0; i<8 && buf_index < LINE_BUF_SZ ; i++) {
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[0]);
+        dac_buff[buf_idx][buf_index] = video_levels[0];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[0];
+
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[0]);
+        dac_buff[buf_idx][buf_index] = video_levels[0];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[0];
+
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[0]);
+        dac_buff[buf_idx][buf_index] = video_levels[0];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[0];
+
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[0]);
+        dac_buff[buf_idx][buf_index] = video_levels[0];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[0];
+      }
+      
+      for (; buf_index < LINE_BUF_SZ; buf_index++ ) {
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[1]);
+        dac_buff[buf_idx][buf_index] = video_levels[1];
+        opamp_buff[buf_idx][buf_index] = video_source;
+      }
+
+      IF_USE_COLOR(phase_buff[buf_idx][LINE_BUF_SZ-1] = phase[1]);
+      dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
+      opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
+    }
+}
+
+#if defined(HIGH_RAM)
+
+EXEC_RAM void render_video_line(uint16_t line)
+{
+    uint16_t* luminance;
+    uint32_t* opamp;
+
+    luminance = &video_levels[0];
+    opamp = &opa_vals[0];
+
+    #if USE_COLOR == 1
+    uint32_t* phase;
+    phase = &phase_val[palPhase][0];
+    phase_buff[buf_idx][0] = phase[2];
+    #endif
+
+    if ((line < minRenderLine) || line >= minRenderLine + VIDEO_HEIGHT) {
+      for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
+        dac_buff[buf_idx][i] = luminance[1];
+        opamp_buff[buf_idx][i] = video_source;
+        IF_USE_COLOR(phase_buff[buf_idx][i] = phase[1]);
+      }
+    } else {
+      uint8_t *line_ptr = video_frame_buffer[active_video_buffer][line - minRenderLine];
+
       uint32_t buf_idx_local = 0;
-      for (uint32_t i = 0; i < VIDEO_BYTES_PER_LINE; i++) {
-          uint8_t byte = line_ptr[i];
+      uint32_t word;
+      uint8_t* byte = (uint8_t*)&word;
+
+      #if USE_COLOR == 1
+      if (show_test_pattern && (line < minRenderLine + 101)) {
+          luminance = &video_levels[8];
+          opamp = &opa_vals[8];
+          phase = &phase_val[palPhase][8];
+      }
+      #endif
+
+      dac_buff[buf_idx][buf_idx_local] = video_levels[1];
+      IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[1]);
+      opamp_buff[buf_idx][buf_idx_local++] = opa_vals[1];
+
+      for (uint32_t i = 0; i < VIDEO_BYTES_PER_LINE; i += VIDEO_BPP) {
+          #if VIDEO_BPP > 3
+          byte[3] = line_ptr[i + VIDEO_BPP - 4];
+          #endif
+          #if VIDEO_BPP > 2
+          byte[2] = line_ptr[i + VIDEO_BPP - 3];
+          #endif
+          #if VIDEO_BPP > 1
+          byte[1] = line_ptr[i + VIDEO_BPP - 2];
+          #endif
+          byte[0] = line_ptr[i + VIDEO_BPP - 1];
+          
           uint8_t pixel;
       
           if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (byte >> 6) & 0x3;
-          dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
-          opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
+          pixel = (word >> (VIDEO_BPP * 7)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
 
           if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (byte >> 4) & 0x3;
-          dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
-          opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
+          pixel = (word >> (VIDEO_BPP * 6)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
 
           if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (byte >> 2) & 0x3;
-          dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
-          opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
+          pixel = (word >> (VIDEO_BPP * 5)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
 
           if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = byte & 0x3;
-          dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
-          opamp_buff[buf_idx][buf_idx_local++] = opa_vals[pixel];
+          pixel = (word >> (VIDEO_BPP * 4)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 3)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 2)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 1)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = word & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
       }
       dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
       opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
@@ -407,62 +647,106 @@ EXEC_RAM void render_video_line(uint16_t line)
 
 EXEC_RAM static void push_line_to_dma(uint16_t line)
 {
+
     buf_idx = (line & 1);
-    // Stop TIM1 and both DMA channels
+    // Stop TIM1 and DMA channels
     LL_TIM_DisableCounter(TIM1);
     LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
     LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
+    #if USE_COLOR == 1
+    LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
+    #endif
 
     // Configure length and addresses
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_1, (uint32_t)&opamp_buff[!buf_idx][0]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
     LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_1, (uint32_t)&dac_buff[!buf_idx][0]); // ! send previous buffer
-    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
+    LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, (LINE_BUF_SZ));
 
     // Enable DMA request for DAC
     LL_DAC_EnableDMAReq(DAC3, LL_DAC_CHANNEL_1);
 
-    // Enable both DMA channels
+    // Enable DMA channels
     LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_1); // first start DAC channel
     LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
+    #if USE_COLOR == 1
+    if(syncState == SYNC_STATE_EXTERNAL) {
+      LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
+      LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
+      LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
+    }
+    #endif
+
     LL_TIM_EnableDMAReq_UPDATE(TIM1);
+    LL_TIM_EnableDMAReq_CC1(TIM1);
+    LL_TIM_EnableDMAReq_CC2(TIM1);
 
 
 #if defined(HIGH_RAM)
     render_video_line(line); // video frame buffer
 #else
     render_line(line); // char canvas map
-#endif
     if (show_test_pattern) {
-      render_test_pattern_line(line);
+      //render_test_pattern_line(line);
     } else if (show_logo) {
       render_overlay_logo_line(line);  
     }
+#endif
 }
+
 
 EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
 {
     CCMRAM_BSS static uint16_t video_line = 0;
+    CCMRAM_BSS static uint16_t videoLineFull = 0;
     CCMRAM_BSS static uint8_t vsync = 0;
+    static uint8_t halfLine = 0;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
-    if(time_ns > 59.f && time_ns < 65.f) {
+    if(time_ns > 59.f && time_ns < 66.5f) {
         video_line++;
+        videoLineFull++;
+
         #ifdef TRIGGER_LINE
-        if (video_line == TRIGGER_LINE) {
+        if (videoLineFull == triggerLine) {
           LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
+        } else {
+          LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
         }
         #endif
-        if (video_line <= MAX_RENDER_LINE) {
-            push_line_to_dma(video_line);
+        if (video_line <= maxRenderLine) {
+          if(syncState == SYNC_STATE_EXTERNAL) {
+            #if USE_COLOR == 1
+            // Detach line sync from COMP2
+            LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP3);
+            LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP3);
+            // Open trigger gate for HRTIM TIMER B colorbust synchronisation
+            LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage_black - 15) * videoInputs[activeVideoInput].gain);
+            LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_EEV_1);
+            #endif
+          }
+          push_line_to_dma(video_line);
         }
         if (new_field == false) {
             new_field = true;
         }
         vsync = 0;
-    } else if (time_ns > 29.0f && time_ns < 33.0f) {
+
+    } else if (time_ns > 29.0f && time_ns < 35.0f) {
         vsync++;
+        halfLine++;
+        if(!(halfLine & 0x01)) {
+          videoLineFull++;
+          #ifdef TRIGGER_LINE
+          if (videoLineFull == triggerLine) {
+            LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
+          } else {
+            LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
+          }
+          #endif
+        }
+        
         if (vsync == 5) {
           sync_voltage_low = DAC12BIT_TO_MV(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(BLACK_LEVEL_ADC_DELAY_NS));
@@ -471,20 +755,33 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           sync_voltage_black = DAC12BIT_TO_MV(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           
           if((syncState == SYNC_STATE_EXTERNAL) && (sync_voltage_black > sync_voltage_low) && (sync_voltage_black - sync_voltage_low > 100)) {
-            sync_voltage = sync_voltage_black - (sync_voltage_black - sync_voltage_low) / 2;
+            sync_voltage = sync_voltage_black - ((sync_voltage_black - sync_voltage_low) / 2);
             LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
           }
         }
+
     } else if (time_ns > 56.0f && time_ns < 58.0f) {
         if (vsync >= 4) {
-          vsync = 4;
-          #if defined(TP1_Pin)
-          LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
+          if(vsync == 5 ) {
+            videoLineFull = 1;
+            halfLine = 1;
+          } else {
+            videoLineFull++;
+          }
+          #ifdef TRIGGER_LINE
+          if (videoLineFull == triggerLine) {
+            LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
+          } else {
+            LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
+          }
           #endif
+
+          vsync = 4;
           LL_TIM_OC_SetCompareCH1(TIM2, NS_TO_TICKS(LOW_SYNC_ADC_DELAY_NS));
         }
+
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
-        if ((videoMode = MODE_PAL && vsync == 8) || (videoMode = MODE_NTSC && vsync == 9)) {
+        if ((videoMode == MODE_PAL && vsync == 8) || (videoMode == MODE_NTSC && vsync == 9)) {
           
           if (new_field == true) {
             new_field = false;
@@ -493,12 +790,14 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
           frame_counter++;
           video_line = 0;
         }
+
     } else {
         vsync = 0;
         // Do nothing, wait for next sync
     }
+
     #ifdef TRIGGER_LINE
-      LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
+      //LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
     #endif
 }
 
@@ -515,9 +814,9 @@ EXEC_RAM static inline void check_resync(uint32_t tim_tick)
         }
     } else if (time_ns > 6.5f && time_ns < 7.5f) {
         if (vsync == 8) {
-          videoMode = MODE_PAL;
+          set_video_mode(MODE_PAL);
         } else if (vsync == 9) {
-          videoMode = MODE_NTSC;
+          set_video_mode(MODE_NTSC);
         }else {
           vsync = 0;
         }
@@ -546,20 +845,86 @@ EXEC_RAM void TIM2_IRQHandler(void)
           }
 
           if (syncState == SYNC_STATE_FOUND) {
-            set_video_source(videoInputs[activeVideoInput].opampInput);
             if (video_gen_enabled == true) {
                 video_gen_stop();
             }
+            TRACE_INFO("Sync found\n");
+            #if USE_COLOR == 1
+            set_color_system(videoMode);
+            set_color_phase(videoMode);
+            #endif
+            set_video_source(videoInputs[activeVideoInput].opampInput);
             syncState = SYNC_STATE_EXTERNAL;
 
           } else if (syncState == SYNC_STATE_EXTERNAL) {
+              //LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
               pars_video_signal(TIM2->CCR2);
+              //LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
+
               set_black_level(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           }
       }
       LL_TIM_ClearFlag_CC2(TIM2);
     }
+
+    if (LL_TIM_IsActiveFlag_CC3(TIM2)) {
+      // Stop pixel output
+      if(syncState == SYNC_STATE_EXTERNAL) {
+        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
+        LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
+        #if USE_COLOR == 1
+        LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
+        #endif
+        OPAMP1->CSR = video_source;
+      }
+      
+      #if USE_COLOR == 1
+      if(syncState == SYNC_STATE_EXTERNAL) {
+        // Attach line sync to COMP2
+        LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
+        LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP2);
+        LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP2);
+      }
+      #endif
+      
+      LL_TIM_ClearFlag_CC3(TIM2);
+    }
 }
+
+#if USE_COLOR == 1
+// Called from COMP2 & TIM3 event (video input)
+EXEC_RAM void TIM3_IRQHandler(void)
+{  
+  static uint8_t phase = 0;
+
+  if (LL_TIM_IsActiveFlag_UPDATE(TIM3)) {
+    palPhase = phase;
+    // Stop synchronizing HRTIM TIMER C with TIMER B
+    LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_C, LL_HRTIM_RESETTRIG_NONE);
+    LL_TIM_ClearFlag_UPDATE(TIM3);
+  }
+
+  if (LL_TIM_IsActiveFlag_CC1(TIM3)) {
+    if(LL_HRTIM_TIM_GetResetTrig(HRTIM1, LL_HRTIM_TIMER_B) == LL_HRTIM_RESETTRIG_EEV_1) {
+      // Close trigger gate for HRTIM TIMER B colorbust synchronisation
+      LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_NONE);
+
+      //Determine PAL phase
+      if(LL_HRTIM_TIM_GetCapture1(HRTIM1, LL_HRTIM_TIMER_B) > (HRTIM_RELOAD_PAL / 2) ) {
+        phase = 0;
+      } else {
+        phase = 1;
+      }
+
+      // Start synchronizing HRTIM TIMER C with TIMER B
+      LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_C, LL_HRTIM_RESETTRIG_OTHER2_CMP2); 
+    }
+
+    LL_TIM_ClearFlag_CC1(TIM3);
+  }
+  
+}
+#endif
 
 // Called form TIM17 event (video gen)
 EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
@@ -569,16 +934,16 @@ EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
       if(DMA1_Channel5->CNDTR == 1) {
         ARR_prev += TIM17->ARR;
       } else {
-        set_video_source(OPAMP_CONST_DAC);
         if (video_gen_enabled == false) {
-            set_black_level(DAC_BLACK);
             video_gen_start();
+            set_video_source(OPAMP_CONST_DAC);
+            set_black_level(DAC_BLACK);
         } else {
             pars_video_signal(ARR_prev);
         }
         ARR_prev = TIM17->ARR;
       }
-        LL_TIM_ClearFlag_UPDATE(TIM17);
+      LL_TIM_ClearFlag_UPDATE(TIM17);
     }
 }
 
@@ -603,9 +968,9 @@ void video_sync_loop(void) {
           TRACE_INFO("Sync lost\n");
           syncState = SYNC_STATE_SEARCH;
           if (syncMode == AUTOMATIC) {
+            video_gen_start();
             set_video_source(OPAMP_CONST_DAC);
             set_black_level(DAC_BLACK);
-            video_gen_start();
           }
           sync_lost = SYNC_LOST_FRAMES_THRESHOLD;
         }
@@ -631,16 +996,16 @@ void setSyncMode(syncMode_t mode) {
       syncMode = EXTERNAL;
       break;
     case INTERNAL:
+      video_gen_start();
       set_video_source(OPAMP_CONST_DAC);
       set_black_level(DAC_BLACK);
-      video_gen_start();
       syncMode = INTERNAL;
       break;
     case OFF:
-      set_video_source(videoInputs[activeVideoInput].opampInput);
       if (video_gen_enabled == true) {
           video_gen_stop();
       }
+      set_video_source(videoInputs[activeVideoInput].opampInput);
       syncMode = OFF;
       break;
   }

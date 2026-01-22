@@ -37,7 +37,7 @@
 #define HSYNC                 N_HSYNC, P_HSYNC
 #define HLSYNC                N_HSYNC, P_HLSYNC
 
-extern uint16_t video_level[];
+extern uint16_t sync_levels[];
 
 // Reverence timing, interlaced, progressive(non-interlaced) : https://martin.hinner.info/vga/pal.html
 #if INTERLACED_GEN
@@ -194,7 +194,7 @@ EXEC_RAM void video_gen_start(void)
         LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_6, GEN_BLANK_PAL_LINES);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_6);
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_5);
-        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_5, (uint32_t)&video_level);     
+        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_5, (uint32_t)&sync_levels);     
         LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_5, (uint32_t)&DAC3->DHR12R1);
         LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_5, 2);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_5);
@@ -205,6 +205,9 @@ EXEC_RAM void video_gen_start(void)
         LL_TIM_EnableCounter(TIM17);
         LL_TIM_EnableDMAReq_CC1(TIM17);
         LL_TIM_EnableDMAReq_UPDATE(TIM17);
+
+        LL_TIM_DisableIT_CC1(TIM3);
+        LL_TIM_DisableIT_UPDATE(TIM3);
 
         video_gen_enabled = true;
     }
@@ -221,6 +224,9 @@ EXEC_RAM void video_gen_stop(void)
         LL_TIM_DisableDMAReq_UPDATE(TIM17);
         LL_TIM_DisableCounter(TIM15);
         LL_TIM_SetTriggerInput(TIM15, LL_TIM_TS_ITR1);
+
+        LL_TIM_EnableIT_CC1(TIM3);
+        LL_TIM_EnableIT_UPDATE(TIM3);
 
         video_gen_enabled = false;
 

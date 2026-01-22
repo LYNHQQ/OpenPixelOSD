@@ -35,7 +35,7 @@
 #define VIDEO_TOTAL_GAIN                        2
 
 // Video input 1 PA3
-#define VIDEO1_INPUT_ENABLED                    true
+#define VIDEO1_INPUT_ENABLED                    false
 #define VIDEO1_INPUT_GAIN                       2
 
 // Video input 2 PA7
@@ -43,4 +43,4 @@
 #define VIDEO2_INPUT_GAIN                       1
 
 
-#define USE_COLOR                               0
+#define USE_COLOR                               1

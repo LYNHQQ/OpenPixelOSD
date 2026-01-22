@@ -17,6 +17,7 @@
 #include "stm32g4xx_ll_pwr.h"
 #include "stm32g4xx_ll_spi.h"
 #include "stm32g4xx_ll_tim.h"
+#include "stm32g4xx_ll_hrtim.h"
 #include "stm32g4xx_ll_usart.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_adc.h"
@@ -40,27 +41,34 @@
 #endif /* MCU_TYPE */
 
 #define ROW_SIZE                                16
-#define COLUMN_SIZE                             38
+#define COLUMN_SIZE                             41
 
-#define VISUAL_PICTURE_LINE_NS                  49000
-#define LINE_START_DELAY_NS                     5500
+#define VISUAL_PICTURE_LINE_NS                  50000
+#define LINE_CENTER_NS                          31400
 
 #define NS_TO_TICKS(ns)                         (((ns) * 170UL) / 1000UL)
 #define VISUAL_PICTURE_LINE_TICKS_MAX           (NS_TO_TICKS(VISUAL_PICTURE_LINE_NS))
 #define PIXELS_PER_LINE                         (COLUMN_SIZE * 12)
-#define TIM1_AUTORELOAD                         ((uint32_t)(VISUAL_PICTURE_LINE_TICKS_MAX / PIXELS_PER_LINE))
-#define VISUAL_PICTURE_LINE_TICKS               (TIM1_AUTORELOAD * PIXELS_PER_LINE)
-#define LINE_START_DELAY                        ((VISUAL_PICTURE_LINE_TICKS_MAX - VISUAL_PICTURE_LINE_TICKS) / 2 + NS_TO_TICKS(LINE_START_DELAY_NS))
+#define TIM1_AUTORELOAD                         ((uint32_t)(VISUAL_PICTURE_LINE_TICKS_MAX / PIXELS_PER_LINE) - 1)
+#define VISUAL_PICTURE_LINE_TICKS               ((TIM1_AUTORELOAD + 1) * PIXELS_PER_LINE)
+#define LINE_START_DELAY                        (NS_TO_TICKS(LINE_CENTER_NS) - (VISUAL_PICTURE_LINE_TICKS) / 2)
+
 
 
 #define BLACK_LEVEL_ADC_DELAY_NS                3300
 #define LOW_SYNC_ADC_DELAY_NS                   6000
+#define COLOR_BURST_SYNC_GATE_CLOSE_NS          2100
+#define VISIBLE_LINE_END_NS                     57000
 
 typedef enum {
   PX_BLACK = 0,
   PX_TRANSPARENT,
   PX_WHITE,
-  PX_GRAY
+  PX_GRAY,
+  PX_GREEN,
+  PX_RED,
+  PX_BLUE,
+  PX_YELLOW
 } px_t;
 
 // see adc.c - adc_init()
@@ -123,10 +131,26 @@ typedef enum {
 
 #if defined(TARGET_PIXELVTX)
 #include "targets\pixelVTX.h"
+#elif defined(TARGET_PIXELVTX_COLOR)
+#include "targets\pixelVTXcolor.h"
 #else
 #include "targets\generic.h"
 #endif
 
+
+#if defined(STM32G474xx) && defined(USE_COLOR) && USE_COLOR == 1 
+#define IF_USE_COLOR(arg)        arg
+#undef  COLUMN_SIZE
+#define COLUMN_SIZE              30
+#else
+#define IF_USE_COLOR(...)        { }
+#undef  USE_COLOR
+#define USE_COLOR                0
+#endif
+
+#ifndef MAX
+#define MAX(a, b)  (((a) > (b)) ? (a) : (b))
+#endif
 
 void gpio_init(void);
 void adc_init(void);
@@ -142,13 +166,14 @@ void DAC3_Init(void);
 void dma_init(void);
 
 void OPAMP1_Init(void);
-void OPAMP6_Init(void);
 
 void TIM1_Init(void);
 void TIM2_Init(void);
+void TIM3_Init(void);
 void TIM7_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);
+void HRTIM1_Init(void);
 
 void COMP2_Init(void);
 void COMP3_Init(void);

@@ -12,15 +12,22 @@
 
 #define VIDEO_WIDTH        (COLUMN_SIZE * 12U)
 #define VIDEO_HEIGHT       (288U)
-#define VIDEO_BPP          (2U)  // bits per pixel
+#if USE_COLOR == 1
+#define VIDEO_BPP          (3U)
+#else
+#define VIDEO_BPP          (2U) 
+#endif
 #define VIDEO_BYTES_PER_LINE ((VIDEO_WIDTH * VIDEO_BPP) / 8U)
 
 void video_graphics_init(void);
 void video_draw_pixel(uint16_t x, uint16_t y, px_t color);
+void video_draw_line(int x0, int y0, int x1, int y1, px_t color);
+void video_draw_rectangle(int x0, int y0, int x1, int y1, px_t color);
 
 void video_render_canvas_from_map(void);
 void video_graphics_draw_complete(void);
 void video_graphics_clear_draw_buff(px_t color);
+void video_draw_char_at(char ch, uint16_t x, uint16_t y, px_t color);
 
 uint16_t video_draw_text_system_font(uint16_t x, uint16_t y, const char *s);
 uint16_t video_draw_text_system_font_fmt(uint16_t x, uint16_t y, const char *fmt, ...);

@@ -38,6 +38,11 @@ typedef struct {
     uint8_t   gain;
 } videoInput_t;
 
+typedef struct {
+    float     phase;
+    uint16_t  luminance;
+} colorMap_t;
+
 extern osdState_e osdState;
 
 void set_video_input(uint8_t input);

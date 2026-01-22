@@ -141,6 +141,17 @@ elseif(BUILD_VARIANT STREQUAL "PIXELVTX")
             ./src/vtx_msp.c
             ./src/settingsMenu.c
             ./src/targets/pixelVTX.c)
+elseif(BUILD_VARIANT STREQUAL "PIXELVTX_COLOR")
+    message(STATUS "Building pixelVTXcolor")
+    set(BUILD_NAME "_pixelVTXcolor")
+    add_compile_definitions(BUILD_VARIANT_VTX)
+    add_compile_definitions(TARGET_PIXELVTX_COLOR)
+    set(VARIANT_SRC
+            ./src/rtc6705.c
+            ./src/rf_pa.c
+            ./src/vtx_msp.c
+            ./src/settingsMenu.c
+            ./src/targets/pixelVTX.c)
 else()
   message(STATUS "Building generic target")
   set(VARIANT_SRC

@@ -12,11 +12,14 @@
 #include "rf_pa.h"
 #include "video_overlay.h"
 
+
 fc_t fc;
 uint8_t boxIdIdx = 0;
 
 uint16_t debug0;
 uint16_t debug1;
+uint16_t debug2;
+uint16_t debug3;
 
 uint8_t mspStickpos(void) {
   uint8_t result = 0;
@@ -29,6 +32,16 @@ uint8_t mspStickpos(void) {
   }
   return result;
 }
+
+extern uint16_t triggerLine;
+extern videoMode_t videoMode;
+
+#if USE_COLOR == 1
+extern uint32_t phase_val[2][10];
+extern float phaseOffset;
+void set_color_phase(videoMode_t mode);
+extern uint16_t colorDelay;
+#endif
 
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
@@ -83,7 +96,9 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
     case MSP_DEBUG:
         debug0 = payload[0] + (uint16_t)(payload[1]<<8);
         debug1 = (uint16_t)payload[2];
-        TRACE_INFO("target_debug %04x %04x\n", debug0, debug1);
+        debug2 = payload[4] + (uint16_t)(payload[5]<<8);
+        debug3 = payload[6] + (uint16_t)(payload[7]<<8);
+        TRACE_INFO("target_debug %04x %04x %04x %04x\n", debug0, debug1, debug2, debug3);
         switch (debug1) {
         case 0:
 #if defined(BUILD_VARIANT_VTX)
@@ -91,14 +106,41 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
 #endif
             break;
         case 1:
+            
             break;
         case 2:
+            #if USE_COLOR == 1
+            if (debug0) {
+              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
+              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (debug0 + debug2) % 1227);
+            } else {
+              LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug2);
+              LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, debug3);
+            }
+            #endif
             break;
         case 3:
+            #ifdef TRIGGER_LINE
+            triggerLine = debug0;
+            #endif
             break;
         case 4:
-            break;
         case 5:
+        case 6:
+            LL_TIM_OC_SetCompareCH2(TIM1, debug0);
+            break;
+        case 7:
+        case 8:
+        case 9:
+            {
+              #if USE_COLOR == 1
+                colorDelay = debug0;
+                LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
+
+                phaseOffset = debug2 / 10.0f;
+                set_color_phase(videoMode);
+              #endif
+            }
             break;
         default:
             break;

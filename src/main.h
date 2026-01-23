@@ -171,6 +171,7 @@ void TIM1_Init(void);
 void TIM2_Init(void);
 void TIM3_Init(void);
 void TIM7_Init(void);
+void TIM8_Init(void);
 void TIM15_Init(void);
 void TIM17_Init(void);
 void HRTIM1_Init(void);

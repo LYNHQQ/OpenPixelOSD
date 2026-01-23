@@ -10,6 +10,7 @@
 #include "video_gen.h"
 #include "video_overlay.h"
 #include "flash.h"
+#include "led.h"
 #if defined(BUILD_VARIANT_VTX)
 #include "rtc6705.h"
 #include "rf_pa.h"
@@ -68,6 +69,7 @@ int main (void)
     gpio_init();
     usb_init();
     dma_init();
+    led_init();
     adc_init();
     flash_init();
 #if defined(BUILD_VARIANT_VTX)
@@ -120,7 +122,10 @@ void led_blink(void)
     static uint32_t last_tick = 0;
 
     if ((HAL_GetTick() - last_tick) >= LED_BLINK_INTERVAL) {
-      LED_STATE_GPIO_Port->ODR ^= LED_STATE_Pin;
+      led_toggle(LED_STATE);
+      led_toggle(0);
+      led_toggle(1);
+      led_toggle(2);
       last_tick = HAL_GetTick();
     }
 }
@@ -140,8 +145,8 @@ void logo_timeout_check(void)
     if (!timeout_checked && (HAL_GetTick() - boot_time) >= LOGO_TIMEOUT_MS) {
         show_logo = false;
         // Clear the canvas to remove version string
-        //canvas_char_clean();
-        //canvas_char_draw_complete();
+        canvas_char_clean();
+        canvas_char_draw_complete();
         timeout_checked = true;
     }
 }

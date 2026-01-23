@@ -12,6 +12,7 @@
 #include "video_gen.h"
 #include "canvas_char.h"
 #include "video_graphics.h"
+#include "led.h"
 #if defined(LOW_RAM)
 #include "fonts/font_bf_default.h"
 #include "logo/logo.h"
@@ -93,7 +94,7 @@ const videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, 
 uint8_t activeVideoInput;
 
 static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
-static uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
+uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
 #if USE_COLOR == 1
 static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
@@ -709,11 +710,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         videoLineFull++;
 
         #ifdef TRIGGER_LINE
-        if (videoLineFull == triggerLine) {
-          LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
-        } else {
-          LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
-        }
+        led_set(TP2,videoLineFull == triggerLine);
         #endif
         if (video_line <= maxRenderLine) {
           if(syncState == SYNC_STATE_EXTERNAL) {
@@ -727,7 +724,10 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
             #endif
           }
           push_line_to_dma(video_line);
+        } else if (video_line == maxRenderLine + 1) {
+          RGB_led_send();
         }
+        
         if (new_field == false) {
             new_field = true;
         }
@@ -739,11 +739,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         if(!(halfLine & 0x01)) {
           videoLineFull++;
           #ifdef TRIGGER_LINE
-          if (videoLineFull == triggerLine) {
-            LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
-          } else {
-            LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
-          }
+          led_set(TP2,videoLineFull == triggerLine);
           #endif
         }
         
@@ -769,11 +765,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
             videoLineFull++;
           }
           #ifdef TRIGGER_LINE
-          if (videoLineFull == triggerLine) {
-            LL_GPIO_SetOutputPin(TP2_GPIO_Port, TP2_Pin);
-          } else {
-            LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
-          }
+          led_set(TP2,videoLineFull == triggerLine);
           #endif
 
           vsync = 4;
@@ -797,7 +789,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
     }
 
     #ifdef TRIGGER_LINE
-      //LL_GPIO_ResetOutputPin(TP2_GPIO_Port, TP2_Pin);
+      //led_set(TP2,0);
     #endif
 }
 
@@ -857,9 +849,9 @@ EXEC_RAM void TIM2_IRQHandler(void)
             syncState = SYNC_STATE_EXTERNAL;
 
           } else if (syncState == SYNC_STATE_EXTERNAL) {
-              //LL_GPIO_SetOutputPin(TP1_GPIO_Port, TP1_Pin);
+              //led_set(TP1,1);
               pars_video_signal(TIM2->CCR2);
-              //LL_GPIO_ResetOutputPin(TP1_GPIO_Port, TP1_Pin);
+              //led_set(TP1,0);
 
               set_black_level(LL_ADC_INJ_ReadConversionData12(ADC1,LL_ADC_INJ_RANK_1) / VIDEO_TOTAL_GAIN);
           }

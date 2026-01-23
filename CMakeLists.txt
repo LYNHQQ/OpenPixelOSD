@@ -200,6 +200,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/video_graphics.c
         ./src/main.c
         ./src/settings.c
+        ./src/led.c
 
 )
 

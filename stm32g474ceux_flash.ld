@@ -64,11 +64,11 @@ __eeprom_size = 0x1000;
 MEMORY
 {
   RAM (xrw)           : ORIGIN = 0x20000000, LENGTH = 96K
-  FLASH (rx)          : ORIGIN = 0x08000000, LENGTH = 0x80000 - 0x4000 - 0x2000 - 0x4000 /* 512K - 4K - 16K - 8K - 16K = 468K */
+  FLASH (rx)          : ORIGIN = 0x08000000, LENGTH = 0x80000 - __eeprom_size - 0x4000 - 0x2000 - 0x4000 /* 512K - 4K - 16K - 8K - 16K = 468K */
   FLASH_SYS_FONT (rx) : ORIGIN = 0x08000000 + (0x80000 - __eeprom_size - 0x4000 - 0x2000 - 0x4000), LENGTH = 0x4000 /* 16K */
   FLASH_LOGO (rx)     : ORIGIN = 0x08000000 + (0x80000 - __eeprom_size - 0x4000 - 0x2000), LENGTH = 0x2000 /* 8K */
   FLASH_MSP_FONT (rx) : ORIGIN = 0x08000000 + (0x80000 - __eeprom_size - 0x4000), LENGTH = 0x4000 /* 16K */
-  FLASH_EEPROM (rx)   : ORIGIN = 0x08000000 + (0x20000 - __eeprom_size), LENGTH = __eeprom_size  /* 4K */
+  FLASH_EEPROM (rx)   : ORIGIN = 0x08000000 + (0x80000 - __eeprom_size), LENGTH = __eeprom_size  /* 4K */
   CCMRAM (xrw)        : ORIGIN = 0x10000000, LENGTH = 32K
 }
 

@@ -105,7 +105,7 @@ uint8_t flash_push(flashBlock_t* block) {
   foundBlock = flash_seek(block->idx);
   if (foundBlock) {
     if (memcmp(foundBlock, block, sizeof(flashBlock_t)) == 0) {
-      TRACE_DEBUG("FLASH match\n");
+      TRACE_DEBUG("FLASH match %lx: \n",(uint32_t)foundBlock);
       return 1;
     }
   }
@@ -121,11 +121,30 @@ uint8_t flash_push(flashBlock_t* block) {
     return 0;
   }
 
-  HAL_FLASH_Unlock();
-  HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)&flashBlock[x], *((uint64_t*)block));
-  HAL_FLASH_Lock();
-
   TRACE_DEBUG("FLASH write %i: %lx: ",x ,(uint32_t)&flashBlock[x]);
+
+  for (uint8_t i=0; i<sizeof(flashBlock_t); i++) {
+    uint8_t* b = (uint8_t*)block;
+    TRACE_DEBUG_WP("%x ", b[i]);
+  }
+  
+
+  const uint8_t max_attempts = 5;
+  uint8_t attemps = 0;
+  HAL_StatusTypeDef status;
+  
+  __disable_irq();
+  HAL_FLASH_Unlock();
+  do {
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
+    status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)&flashBlock[x], *((uint64_t*)block));
+    attemps++;
+  } while (status && attemps < max_attempts);
+  HAL_FLASH_Lock();
+  __enable_irq();
+
+  TRACE_DEBUG_WP("status %i verify: ", status);
+  
   for (uint8_t i=0; i<sizeof(flashBlock_t); i++) {
     TRACE_DEBUG_WP("%x ", ((uint8_t*)&flashBlock[x])[i]);
   }

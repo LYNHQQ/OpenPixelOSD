@@ -83,6 +83,12 @@
 #define REG7_PA5G_PW_SHIFT  7
 #define REG7_PA5G_PW_MASK   (0x3u << REG7_PA5G_PW_SHIFT)
 
+#define REG7_PD_Q5G_SHIFT   6
+#define REG7_PD_Q5G_MASK    (0x1u << REG7_PD_Q5G_SHIFT)
+
+#define REG7_PA5G_BS_SHIFT  9
+#define REG7_PA5G_BS_MASK   (0x7u << REG7_PA5G_BS_SHIFT)
+
 #ifndef RTC6705_POST_WRITE_DELAY_US
 #define RTC6705_POST_WRITE_DELAY_US   50u
 #endif
@@ -338,8 +344,8 @@ void rtc6705_set_power(rtc6705_power_t level)
     }
 
     uint32_t reg = rtc6705_read_reg(RTC6705_REG_VCO3) & 0xFFFFFu;
-    uint32_t new_reg = (reg & ~REG7_PA5G_PW_MASK) |
-                    ((((uint32_t)level) << REG7_PA5G_PW_SHIFT) & REG7_PA5G_PW_MASK);
+    uint32_t new_reg = (reg & ~(REG7_PA5G_BS_MASK | REG7_PA5G_PW_MASK | REG7_PD_Q5G_MASK)) |
+                    ((((uint32_t)level) << REG7_PD_Q5G_SHIFT) & (REG7_PA5G_BS_MASK | REG7_PA5G_PW_MASK |  REG7_PD_Q5G_MASK));
 
     if (new_reg == g_reg7_cached) {
         return; // no write if unchanged

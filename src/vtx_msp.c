@@ -122,7 +122,7 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
 
     /* Set internal RTC6705 PA to minimum */
     rtc6705_allow_power_writes(true);
-    rtc6705_set_power(RTC6705_PA_3dBm);
+    rtc6705_set_power(RTC6705_LOW);
     rtc6705_allow_power_writes(false);
 
     /* Program synthesizer frequency (MHz) */

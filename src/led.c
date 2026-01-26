@@ -11,10 +11,7 @@ uint8_t* rgb_buffer;
 void led_init(void)
 {
     TIM8_Init();
-    rgbLed[0] = RGB(0,64,0);
-    rgbLed[1] = RGB(0,0,64);
-    rgbLed[2] = RGB(64,0,0);
-}
+}   
 
 void led_set(uint8_t idx, uint32_t value) {
   GPIO_TypeDef *GPIOx;

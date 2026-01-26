@@ -3,9 +3,11 @@
 
 #include "settingsMenu.h"
 #include "settings.h"
+#if defined(BUILD_VARIANT_VTX)
 #include "vtx_msp.h"
-#include "canvas_char.h"
 #include "rf_pa.h"
+#endif
+#include "canvas_char.h"
 #include "video_overlay.h"
 #include "msp_displayport.h"
 #include "msp_fc.h"
@@ -20,6 +22,7 @@ uint8_t tempVideoInput;
 
 extern CCMRAM_DATA bool show_logo;
 
+void printMenuValueVtx(uint8_t x, uint8_t y, uint8_t idx);
 void printMenuValue(uint8_t x, uint8_t y, uint8_t idx);
 void changeChannel(ButtonEvent_e btn, uint8_t idx);
 void changePower(ButtonEvent_e btn, uint8_t idx);
@@ -29,63 +32,65 @@ void changePit(ButtonEvent_e btn, uint8_t idx);
 void changeDisplayport(ButtonEvent_e btn, uint8_t idx);
 void changeVideoIn(ButtonEvent_e btn, uint8_t idx);
 
-osdEntry_t osdMenue[] = { {"BAND",        (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeChannel},
-                          {"CHANNEL",     (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeChannel},
-                          {"FREQUENCY",   (osdPrintFuncPtr)printMenuValue,    NULL},
-                          {"POWER",       (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePower},
-                          {"PIT MODE",    (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changePit},
-                          {"DISPLAYPORT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeDisplayport},
-                          #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
-                          {"VIDEO INPUT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeVideoIn},
+typedef enum {
+  MENU_EXIT = 0,
+  MENU_SAVE_EXIT,
+  MENU_BAND,
+  MENU_CHANNEL,
+  MENU_FREQUENCY,
+  MENU_POWER,
+  MENU_PIT_MODE,
+  MENU_DISPLAYPORT,
+  MENU_VIDEO_INPUT
+} menuIdx_t;
+
+osdEntry_t osdMenue[] = { 
+                          #if defined(BUILD_VARIANT_VTX)
+                          {MENU_BAND,         "BAND",        (osdPrintFuncPtr)printMenuValueVtx, (osdKeyFuncPtr)changeChannel},
+                          {MENU_CHANNEL,      "CHANNEL",     (osdPrintFuncPtr)printMenuValueVtx, (osdKeyFuncPtr)changeChannel},
+                          {MENU_FREQUENCY,    "FREQUENCY",   (osdPrintFuncPtr)printMenuValueVtx, NULL},
+                          {MENU_POWER,        "POWER",       (osdPrintFuncPtr)printMenuValueVtx, (osdKeyFuncPtr)changePower},
+                          {MENU_PIT_MODE,     "PIT MODE",    (osdPrintFuncPtr)printMenuValueVtx, (osdKeyFuncPtr)changePit},
                           #endif
-                          {"EXIT",        NULL,                               (osdKeyFuncPtr)exitVtxMenu},
-                          {"SAVE+EXIT",   NULL,                               (osdKeyFuncPtr)exitVtxMenu}};
+                          {MENU_DISPLAYPORT,  "DISPLAYPORT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeDisplayport},
+                          #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
+                          {MENU_VIDEO_INPUT,  "VIDEO INPUT", (osdPrintFuncPtr)printMenuValue,    (osdKeyFuncPtr)changeVideoIn},
+                          #endif
+                          {MENU_EXIT,         "EXIT",        NULL,                               (osdKeyFuncPtr)exitVtxMenu},
+                          {MENU_SAVE_EXIT,    "SAVE+EXIT",   NULL,                               (osdKeyFuncPtr)exitVtxMenu}};
 
 #define MENUE_SIZE        (sizeof(osdMenue) / sizeof(osdMenue[0]))
 
-void printMenuValue(uint8_t x, uint8_t y, uint8_t idx) {
+#if defined(BUILD_VARIANT_VTX)
+void printMenuValueVtx(uint8_t x, uint8_t y, uint8_t idx) {
   char buffer[20] = {0};
 
   switch (idx) {
-    case 0:
+    case MENU_BAND:
       if(tempBand) {
         memcpy(buffer, vtx_get_band_name(tempBand - 1), 8);
       } else {
         sprintf(buffer, "DIRECT F");
       }
       break;
-    case 1:
+    case MENU_CHANNEL:
       sprintf(buffer, "%1i   ", tempChannel);
       break;
-    case 2:
+    case MENU_FREQUENCY:
       if(tempBand) {
         sprintf(buffer, "%1i",vtx_get_frequency(tempBand - 1, tempChannel - 1) );
       } else {
         sprintf(buffer, "%1i",vtx_get_config()->frequency);
       }
       break;
-    case 3:
+    case MENU_POWER:
       sprintf(buffer, "%i MW  ",vtx_get_power_mw() );
       break;
-    case 4:
+    case MENU_PIT_MODE:
       if (vtx_get_config()->pitmode)
         sprintf(buffer, "ON ");
       else
         sprintf(buffer, "OFF");
-      break;
-    case 5:
-      if (settings.displayportEnabled)
-        sprintf(buffer, "ON ");
-      else
-        sprintf(buffer, "OFF");
-      break;
-    case 6:
-      if (tempVideoInput == 0)
-        sprintf(buffer, "INPUT 1 ");
-      else if (tempVideoInput == 1)
-        sprintf(buffer, "INPUT 2 ");
-      else
-        sprintf(buffer, "CAM CTRL");
       break;
     default:
       break;
@@ -96,13 +101,13 @@ void printMenuValue(uint8_t x, uint8_t y, uint8_t idx) {
 
 void changeChannel(ButtonEvent_e btn, uint8_t idx) {
   switch (idx) {
-    case 0:
+    case MENU_BAND:
        if (btn == BTN_RIGHT)
         tempBand = ((tempBand) % vtx_get_band_count()) + 1;
       else
         tempBand = ((vtx_get_band_count() + tempBand - 2 ) % vtx_get_band_count()) + 1;
       break;
-    case 1:
+    case MENU_CHANNEL:
       if (btn == BTN_RIGHT)
         tempChannel = ((tempChannel ) % 8) + 1;
       else
@@ -127,6 +132,32 @@ void changePit(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__(
   
   vtx_set_pitmode(1 - vtx_get_config()->pitmode);
   TRACE_INFO("pitmode %i\r",vtx_get_config()->pitmode);
+}
+#endif
+
+void printMenuValue(uint8_t x, uint8_t y, uint8_t idx) {
+  char buffer[20] = {0};
+
+  switch (idx) {
+    case MENU_DISPLAYPORT:
+      if (settings.displayportEnabled)
+        sprintf(buffer, "ON ");
+      else
+        sprintf(buffer, "OFF");
+      break;
+    case MENU_VIDEO_INPUT:
+      if (tempVideoInput == 0)
+        sprintf(buffer, "INPUT 1 ");
+      else if (tempVideoInput == 1)
+        sprintf(buffer, "INPUT 2 ");
+      else
+        sprintf(buffer, "CAM CTRL");
+      break;
+    default:
+      break;
+  }
+  canvas_print(x, y, buffer);
+  canvas_char_draw_complete();
 }
 
 void changeDisplayport(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribute__((unused)) idx) {
@@ -157,8 +188,10 @@ void changeVideoIn(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribut
 void exitVtxMenu(ButtonEvent_e btn, uint8_t idx) {
   if (btn == BTN_RIGHT) {
     osdState = OSD_EXIT_MENU;
-    if (idx == MENUE_SIZE - 1) {
+    if (idx == MENU_SAVE_EXIT) {
+      #if defined(BUILD_VARIANT_VTX)
       vtx_set_band_channel(tempBand, tempChannel);
+      #endif
       settings_save();
     }
   }
@@ -185,8 +218,10 @@ void msp_menu(void) {
     osdState = OSD_MENU;
     selectedEntry = 0;
     btnLast = BTN_INVALID;
+    #if defined(BUILD_VARIANT_VTX)
     tempChannel = vtx_get_config()->channel;
     tempBand = vtx_get_config()->band;
+    #endif
     show_logo = false;
 
     if (settings.camswitchEnabled)
@@ -203,7 +238,7 @@ void msp_menu(void) {
       if (i == selectedEntry)
         canvas_print(OSD_MENU_TEXT_LEFT - 1, OSD_MENU_TOP + i, ">");
       if (osdMenue[i].printFunc != NULL) {
-        osdMenue[i].printFunc(OSD_MENU_VALUE_LEFT ,OSD_MENU_TOP + i, i);
+        osdMenue[i].printFunc(OSD_MENU_VALUE_LEFT ,OSD_MENU_TOP + i, osdMenue[i].idx);
         if (osdMenue[i].keyFunc != NULL) {
           canvas_print(OSD_MENU_VALUE_LEFT - 2, OSD_MENU_TOP + i, "<");
           canvas_print(OSD_MENU_VALUE_LEFT + 9, OSD_MENU_TOP + i, ">");
@@ -238,7 +273,7 @@ void msp_menu(void) {
       osdMenue[selectedEntry].keyFunc(btn, selectedEntry);
       for (uint8_t i = 0; i < MENUE_SIZE; i++) {
         if (osdState == OSD_MENU && osdMenue[i].printFunc != NULL)
-          osdMenue[i].printFunc(OSD_MENU_VALUE_LEFT ,OSD_MENU_TOP + i, i);
+          osdMenue[i].printFunc(OSD_MENU_VALUE_LEFT ,OSD_MENU_TOP + i, osdMenue[i].idx);
       }
     }
   }

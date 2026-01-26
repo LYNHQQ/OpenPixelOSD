@@ -128,7 +128,6 @@ if(BUILD_VARIANT STREQUAL "VTX")
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/settingsMenu.c
             ./src/targets/generic.c)
 elseif(BUILD_VARIANT STREQUAL "PIXELVTX")
     message(STATUS "Building pixelVTX")
@@ -139,7 +138,6 @@ elseif(BUILD_VARIANT STREQUAL "PIXELVTX")
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/settingsMenu.c
             ./src/targets/pixelVTX.c)
 elseif(BUILD_VARIANT STREQUAL "PIXELVTX_COLOR")
     message(STATUS "Building pixelVTXcolor")
@@ -150,7 +148,6 @@ elseif(BUILD_VARIANT STREQUAL "PIXELVTX_COLOR")
             ./src/rtc6705.c
             ./src/rf_pa.c
             ./src/vtx_msp.c
-            ./src/settingsMenu.c
             ./src/targets/pixelVTX.c)
 else()
   message(STATUS "Building generic target")
@@ -200,6 +197,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/video_graphics.c
         ./src/main.c
         ./src/settings.c
+        ./src/settingsMenu.c
         ./src/led.c
 
 )

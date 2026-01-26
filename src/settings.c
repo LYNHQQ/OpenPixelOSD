@@ -16,7 +16,9 @@
 setting_t settings;
 
 void settings_load(void) {
+  #if defined(BUILD_VARIANT_VTX)
   vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
+  #endif
 
   settings.idx = BLOCK_SETTINGS;
   if(!eeprom_read((flashBlock_t*) &settings)) {
@@ -25,17 +27,19 @@ void settings_load(void) {
     settings.band = 4;
     settings.channel = 4;
     settings.power = 1;
-    settings.frequency =5800;
+    settings.frequency = 5800;
   } 
 
+  #if defined(BUILD_VARIANT_VTX)
   vtx_config->band = settings.band;
   vtx_config->channel = settings.channel;
   vtx_config->power = settings.power;
   vtx_config->frequency = settings.frequency;
-
+  #endif
 }
 
 void settings_save(void) {
+  #if defined(BUILD_VARIANT_VTX)
   vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
 
   settings.idx = BLOCK_SETTINGS;
@@ -43,6 +47,7 @@ void settings_save(void) {
   settings.channel = vtx_config->channel;
   settings.power = vtx_config->power;
   settings.frequency = vtx_config->frequency;
+  #endif
 
   eeprom_write((flashBlock_t*) &settings);
   eeprom_save();

@@ -48,7 +48,7 @@ EXEC_RAM void canvas_print(uint8_t x, uint8_t y, const char *str) {
   if (y >= ROW_SIZE) return;
 
   while (*str && x < COLUMN_SIZE) {
-    video_draw_char_at(*str++, x++ * FONT_WIDTH, y * FONT_HEIGHT, PX_YELLOW);
+    video_draw_char_at(*str++, x++ * FONT_WIDTH, y * FONT_HEIGHT, PX_WHITE);
   }
 }
 

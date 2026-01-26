@@ -13,6 +13,7 @@
 #include "usb.h"
 #include "rf_pa.h"
 #include "flash.h"
+#include "led.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -124,6 +125,10 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
     rtc6705_allow_power_writes(true);
     rtc6705_set_power(RTC6705_LOW);
     rtc6705_allow_power_writes(false);
+    if(g_cfg.configSet)
+      led_set(0,RGB_BLUE);
+    else
+      led_set(0,RGB_RED);
 
     /* Program synthesizer frequency (MHz) */
     if (freq_is_in_58ghz(cfg->frequency)) {
@@ -139,6 +144,7 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
 
         /* Set external RF Power Amplifier */
         rf_pa_set_power_level(cfg->power);
+        led_set(0,RGB_GREEN);
     }
 }
 

@@ -49,6 +49,11 @@
 
 #define BITMASK(n)          ((1U << (n)) - 1U)
 
+#if defined(LOW_RAM)
+#define DMA_DOUBLE_BUFFER   1
+#else
+#define DMA_DOUBLE_BUFFER   0
+#endif
 
 const colorMap_t colorMap[][16] =  { 
                                     { {0.0f,    0},       // black
@@ -93,11 +98,11 @@ const videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, 
                                 {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
 uint8_t activeVideoInput;
 
-static uint16_t dac_buff[2][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
-uint32_t opamp_buff[2][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
+uint16_t dac_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
+uint32_t opamp_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
 #if USE_COLOR == 1
-static uint32_t phase_buff[2][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
+static uint32_t phase_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
 uint32_t phase_val[2][16] = {0};
 
 uint8_t palPhase = 0;
@@ -203,13 +208,12 @@ void set_color_phase(videoMode_t mode)
 
 EXEC_RAM static void init_buffers()
 {
-    for (uint32_t j = 0; j < LINE_BUF_SZ; j++) {
-        dac_buff[0][j] = DAC_BLACK;
-        opamp_buff[0][j] = video_source;
-        IF_USE_COLOR(phase_buff[0][j] = 0);
-        dac_buff[1][j] = DAC_BLACK;
-        opamp_buff[1][j] = video_source;
-        IF_USE_COLOR(phase_buff[1][j] = 0);
+    for(uint8_t b = 0; b <= DMA_DOUBLE_BUFFER; b++) {
+      for (uint32_t j = 0; j < LINE_BUF_SZ; j++) {
+          dac_buff[b][j] = DAC_BLACK;
+          opamp_buff[b][j] = video_source;
+          IF_USE_COLOR(phase_buff[b][j] = 0);
+      }
     }
 }
 
@@ -340,14 +344,13 @@ void video_overlay_init(void)
     set_black_level(DAC_BLACK);
     set_video_source(OPAMP_CONST_DAC);
 
-    if (settings.displayportEnabled) {     
+    if (settings.displayportEnabled) {
       setSyncMode(AUTOMATIC);
       osdState = OSD_MSP;
     } else {
       setSyncMode(OFF);
       osdState = OSD_OFF;
     }
-
 }
 
 void scan_sync_voltage() {
@@ -648,8 +651,12 @@ EXEC_RAM void render_video_line(uint16_t line)
 
 EXEC_RAM static void push_line_to_dma(uint16_t line)
 {
-
-    buf_idx = (line & 1);
+    #if DMA_DOUBLE_BUFFER == 0
+      buf_idx = 0;
+    #else
+      buf_idx = (line & 1);
+    #endif
+    
     // Stop TIM1 and DMA channels
     LL_TIM_DisableCounter(TIM1);
     LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
@@ -659,30 +666,31 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     #endif
 
     // Configure length and addresses
-    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_1, (uint32_t)&opamp_buff[!buf_idx][0]); // ! send previous buffer
+    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_1, (uint32_t)&opamp_buff[buf_idx ^ DMA_DOUBLE_BUFFER][0]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_1, LINE_BUF_SZ);
-    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_1, (uint32_t)&dac_buff[!buf_idx][0]); // ! send previous buffer
+    LL_DMA_SetMemoryAddress(DMA2, LL_DMA_CHANNEL_1, (uint32_t)&dac_buff[buf_idx ^ DMA_DOUBLE_BUFFER][0]); // ! send previous buffer
     LL_DMA_SetDataLength(DMA2, LL_DMA_CHANNEL_1, (LINE_BUF_SZ));
 
     // Enable DMA request for DAC
     LL_DAC_EnableDMAReq(DAC3, LL_DAC_CHANNEL_1);
 
-    // Enable DMA channels
-    LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_1); // first start DAC channel
-    LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
+    if ((line > minRenderLine - (1 - DMA_DOUBLE_BUFFER))) {
+      // Enable DMA channels
+      LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_1); // first start DAC channel
+      LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
-    #if USE_COLOR == 1
-    if(syncState == SYNC_STATE_EXTERNAL) {
-      LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[!buf_idx][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
-      LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
-      LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
+      #if USE_COLOR == 1
+      if(syncState == SYNC_STATE_EXTERNAL) {
+        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[buf_idx ^ DMA_DOUBLE_BUFFER][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
+        LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
+        LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
+      }
+      #endif
+
+      LL_TIM_EnableDMAReq_UPDATE(TIM1);
+      LL_TIM_EnableDMAReq_CC1(TIM1);
+      LL_TIM_EnableDMAReq_CC2(TIM1);
     }
-    #endif
-
-    LL_TIM_EnableDMAReq_UPDATE(TIM1);
-    LL_TIM_EnableDMAReq_CC1(TIM1);
-    LL_TIM_EnableDMAReq_CC2(TIM1);
-
 
 #if defined(HIGH_RAM)
     render_video_line(line); // video frame buffer
@@ -798,7 +806,7 @@ EXEC_RAM static inline void check_resync(uint32_t tim_tick)
     CCMRAM_BSS static uint8_t vsync = 0;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
-    if (time_ns > 29.0f && time_ns < 33.0f) {
+    if (time_ns > 29.0f && time_ns < 35.0f) {
         vsync++;
     } else if (time_ns > 56.0f && time_ns < 58.0f) {
         if (vsync >= 4) {
@@ -903,9 +911,9 @@ EXEC_RAM void TIM3_IRQHandler(void)
 
       //Determine PAL phase
       if(LL_HRTIM_TIM_GetCapture1(HRTIM1, LL_HRTIM_TIMER_B) > (HRTIM_RELOAD_PAL / 2) ) {
-        phase = 0;
+        phase = 1 ^ DMA_DOUBLE_BUFFER;
       } else {
-        phase = 1;
+        phase = 0 ^ DMA_DOUBLE_BUFFER;
       }
 
       // Start synchronizing HRTIM TIMER C with TIMER B
@@ -926,11 +934,7 @@ EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)
       if(DMA1_Channel5->CNDTR == 1) {
         ARR_prev += TIM17->ARR;
       } else {
-        if (video_gen_enabled == false) {
-            video_gen_start();
-            set_video_source(OPAMP_CONST_DAC);
-            set_black_level(DAC_BLACK);
-        } else {
+        if (video_gen_enabled == true) {
             pars_video_signal(ARR_prev);
         }
         ARR_prev = TIM17->ARR;
@@ -949,7 +953,7 @@ void video_sync_loop(void) {
   }
 
   if (((HAL_GetTick() - last_tick) >= 25) || (frame_counter != last_frame)) {
-    
+
     if(syncState == SYNC_STATE_SEARCH) {
       scan_sync_voltage();
     } 
@@ -961,6 +965,8 @@ void video_sync_loop(void) {
           syncState = SYNC_STATE_SEARCH;
           if (syncMode == AUTOMATIC) {
             video_gen_start();
+            LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP2);
+            LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP2);
             set_video_source(OPAMP_CONST_DAC);
             set_black_level(DAC_BLACK);
           }
@@ -989,6 +995,8 @@ void setSyncMode(syncMode_t mode) {
       break;
     case INTERNAL:
       video_gen_start();
+      LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP2);
+      LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP2);
       set_video_source(OPAMP_CONST_DAC);
       set_black_level(DAC_BLACK);
       syncMode = INTERNAL;

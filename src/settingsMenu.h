@@ -18,6 +18,7 @@ typedef void (*osdPrintFuncPtr)(uint8_t x, uint8_t y, uint8_t idx);
 typedef void (*osdKeyFuncPtr)(ButtonEvent_e btn, uint8_t idx);
 
 typedef struct {
+    uint8_t idx;
     const char *text;
     osdPrintFuncPtr printFunc;
     osdKeyFuncPtr keyFunc;

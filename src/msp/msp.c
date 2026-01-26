@@ -396,7 +396,7 @@ EXEC_RAM void msp_loop_process(void)
             if (!vtx_get_config()->configSet) {
               if(configRequest) {
                 vtx_msp_request_config(MSP_OWNER_UART);
-                configRequest--;
+                //configRequest--;
               } else {
                 vtx_set_pitmode(0);
                 vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();

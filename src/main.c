@@ -11,12 +11,12 @@
 #include "video_overlay.h"
 #include "flash.h"
 #include "led.h"
+#include "settings.h"
+#include "settingsMenu.h"
 #if defined(BUILD_VARIANT_VTX)
 #include "rtc6705.h"
 #include "rf_pa.h"
 #include "vtx_msp.h"
-#include "settingsMenu.h"
-#include "settings.h"
 #endif
 #include <stdio.h>
 #ifdef TRACE_LEVEL
@@ -38,7 +38,9 @@ void logo_timeout_check(void);
 extern volatile uint16_t sync_voltage;
 extern uint16_t sync_voltage_low;
 extern uint16_t sync_levels[];
+#if defined(BUILD_VARIANT_VTX)
 extern double rf_detector;
+#endif
 
 void debug_print_loop(void)
 {
@@ -46,7 +48,11 @@ void debug_print_loop(void)
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
+        #if defined(BUILD_VARIANT_VTX)
         TRACE_CMD(uint16_t rf_detect_int = rf_detector);
+        #else
+        uint16_t rf_detect_int =0;
+        #endif
         TRACE_INFO("sync V:%i bl: %i sync low:%i adc_PA:%i adc_5V:%i\n",
           sync_voltage, 
           (uint16_t)DAC12BIT_TO_MV(sync_levels[1] / VIDEO_TOTAL_GAIN), 
@@ -72,9 +78,7 @@ int main (void)
     led_init();
     adc_init();
     flash_init();
-#if defined(BUILD_VARIANT_VTX)
     settings_load();
-#endif
     video_overlay_init();
 
 #if defined(HIGH_RAM)
@@ -100,8 +104,9 @@ int main (void)
         debug_print_loop();
         logo_timeout_check();
         video_sync_loop();
-#if defined(BUILD_VARIANT_VTX)
         msp_menu();
+
+#if defined(BUILD_VARIANT_VTX)
         rf_pa_loop();
 #endif
 
@@ -123,9 +128,7 @@ void led_blink(void)
 
     if ((HAL_GetTick() - last_tick) >= LED_BLINK_INTERVAL) {
       led_toggle(LED_STATE);
-      led_toggle(0);
-      led_toggle(1);
-      led_toggle(2);
+
       last_tick = HAL_GetTick();
     }
 }

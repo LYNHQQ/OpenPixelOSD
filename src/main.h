@@ -53,7 +53,7 @@
 #define VISUAL_PICTURE_LINE_TICKS               ((TIM1_AUTORELOAD + 1) * PIXELS_PER_LINE)
 #define LINE_START_DELAY                        (NS_TO_TICKS(LINE_CENTER_NS) - (VISUAL_PICTURE_LINE_TICKS) / 2)
 
-
+#define OPAMP_DELAY                             4
 
 #define BLACK_LEVEL_ADC_DELAY_NS                3300
 #define LOW_SYNC_ADC_DELAY_NS                   6000
@@ -142,6 +142,8 @@ typedef enum {
 #define IF_USE_COLOR(arg)        arg
 #undef  COLUMN_SIZE
 #define COLUMN_SIZE              30
+#undef  OPAMP_DELAY
+#define OPAMP_DELAY              17
 #else
 #define IF_USE_COLOR(...)        { }
 #undef  USE_COLOR

@@ -58,7 +58,7 @@ void TIM1_Init(void)
     TIM_OC_InitStruct.OCMode = LL_TIM_OCMODE_PWM1;
     TIM_OC_InitStruct.OCState = LL_TIM_OCSTATE_DISABLE;
     TIM_OC_InitStruct.OCNState = LL_TIM_OCSTATE_DISABLE;
-    TIM_OC_InitStruct.CompareValue = 17;
+    TIM_OC_InitStruct.CompareValue = OPAMP_DELAY;
     TIM_OC_InitStruct.OCPolarity = LL_TIM_OCPOLARITY_HIGH;
     TIM_OC_InitStruct.OCNPolarity = LL_TIM_OCPOLARITY_HIGH;
     TIM_OC_InitStruct.OCIdleState = LL_TIM_OCIDLESTATE_LOW;

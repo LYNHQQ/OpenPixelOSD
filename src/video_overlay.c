@@ -713,7 +713,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
     static uint8_t halfLine = 0;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
-    if(time_ns > 59.f && time_ns < 66.5f) {
+    if(time_ns > 59.f && time_ns < 67.5f) {
         video_line++;
         videoLineFull++;
 

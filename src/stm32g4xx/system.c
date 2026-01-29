@@ -3,6 +3,7 @@
  * Copyright (C) 2025 Vitaliy N <vitaliy.nimych@gmail.com>
  */
 #include "system.h"
+#include "main.h"
 
 void Error_Handler(void)
 {
@@ -11,7 +12,6 @@ void Error_Handler(void)
     {
     }
 }
-
 
 void SystemClock_Config(void)
 {
@@ -23,11 +23,20 @@ void SystemClock_Config(void)
     {
     }
     LL_PWR_EnableRange1BoostMode();
+
+#ifdef HSI_ENABLED
+    LL_RCC_HSI_Enable();
+    /* Wait till HSI is ready */
+    while(LL_RCC_HSI_IsReady() != 1)
+    {
+    }
+#else
     LL_RCC_HSE_Enable();
     /* Wait till HSE is ready */
     while(LL_RCC_HSE_IsReady() != 1)
     {
     }
+#endif
 
     LL_RCC_HSI48_Enable();
     /* Wait till HSI48 is ready */
@@ -35,7 +44,11 @@ void SystemClock_Config(void)
     {
     }
 
+#ifdef HSI_ENABLED
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_4, 85, LL_RCC_PLLR_DIV_2);
+#else
     LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_2, 85, LL_RCC_PLLR_DIV_2);
+#endif
     LL_RCC_PLL_EnableDomain_SYS();
     LL_RCC_PLL_Enable();
     /* Wait till PLL is ready */

@@ -28,7 +28,7 @@ uint16_t rf_pa_read_vdet_mv(void);
 uint16_t rf_pa_get_vref_mv(void);
 void rf_pa_set_vref_mv(uint16_t mv);
 void rf_pa_set_calibration(uint16_t mv);
-uint16_t rf_pa_set_power_level(uint8_t level);
+void rf_pa_set_power_level(uint8_t level);
 void rf_pa_loop(void);
 
 #endif //RF_PA_H

@@ -283,6 +283,8 @@ void vtx_msp_clear_table_and_set_defaults(uint8_t owner)
     vtx_msp_push_power_table(owner);
     vtx_msp_push_band_table(owner);
     vtx_msp_eeprom_write(owner);
+
+    g_cfg.vtx_table_available = 1;
 }
 
 /* Power table

@@ -111,7 +111,7 @@ async def scanPa(power):
     msp.send_MSP_SET_PACALIBRATION(paval)
     await asyncio.sleep(0.5)
 
-    while True:
+    while paval < 3300:
       for r in range(4):
         msp.send_MSP_SET_PACALIBRATION(paval)
         await asyncio.sleep(0.1)
@@ -130,7 +130,7 @@ async def scanPa(power):
         break
       paval -=5
 
-    while True:
+    while paval < 3300:
       for r in range(4):
         msp.send_MSP_SET_PACALIBRATION(paval)
         await asyncio.sleep(0.1)
@@ -150,6 +150,11 @@ async def scanPa(power):
     
     msp.send_MSP_SET_PACALIBRATION(1)
 
+  meter.frequency = 5800
+  msp.frequency = 5800
+  msp.power = 1
+  msp.pitmode = 1
+  msp.send_MSP_VTX_CONFIG()
 
 async def scanDetector(power):
   global meter
@@ -176,7 +181,7 @@ async def scanDetector(power):
 
     avg_pwr = [0] * 3
     avg_det = [0] * 3
-    while True:
+    while paval < 3300:
       avg_pwr[0] = 0
       avg_det[0] = 0
       for r in range(20):

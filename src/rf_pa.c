@@ -13,15 +13,19 @@
 static uint16_t g_vref_mv = 0;
 float rf_detector_target = 0;
 double rf_detector = 0;
+static float pa_control_i = 0;
+static float pa_control_last_deviation = 0;
+
 
 static inline void dac_ch2_write_mv(uint16_t mv)
 {
-    uint32_t dac_raw = DAC12BIT_FROM_MV(mv);
     #ifdef PA_LIMIT
-      if (dac_raw > PA_LIMIT) {
-        dac_raw = PA_LIMIT;
+      if (mv > PA_LIMIT) {
+        mv = PA_LIMIT;
       } 
     #endif
+    uint32_t dac_raw = DAC12BIT_FROM_MV(mv);
+    
     if (dac_raw > 4095u) dac_raw = 4095u;
     LL_DAC_ConvertData12RightAligned(DAC1, LL_DAC_CHANNEL_2, dac_raw);
     LL_DAC_TrigSWConversion(DAC1, LL_DAC_CHANNEL_2);
@@ -56,9 +60,9 @@ uint16_t rf_pa_get_vref_mv(void)
     return g_vref_mv;
 }
 
-uint16_t rf_pa_read_vdet_mv(void)
+uint16_t rf_pa_read_vdet_raw(void)
 {
-    return adc_read_mv(ADC_CH_PA_VDET);
+    return adc_read_raw(ADC_CH_PA_VDET);
 }
 
 float map(float x, float in_min, float in_max, float out_min, float out_max)
@@ -116,7 +120,7 @@ uint16_t get_calibration_mV(uint8_t level)
   return retVal;
 }
 
-uint16_t rf_pa_set_power_level(uint8_t level)
+void rf_pa_set_power_level(uint8_t level)
 {
     uint16_t mv;
 
@@ -124,14 +128,16 @@ uint16_t rf_pa_set_power_level(uint8_t level)
       mv = 0;
       rf_detector_target = 0;
       rf_detector = 0;
+      pa_control_i = 0;
+      pa_control_last_deviation = 0;
+      rf_pa_set_vref_mv(mv);
     } else {
-      mv = get_calibration_mV(level);
       rf_detector_target = get_detector_target(level);
-      rf_detector = rf_detector_target;
+      if(rf_detector_target == 0) {
+        mv = get_calibration_mV(level);
+        rf_pa_set_vref_mv(mv);
+      }
     }
-
-    rf_pa_set_vref_mv(mv);
-    return mv;
 }
 
 void rf_pa_set_calibration(uint16_t mv)
@@ -207,27 +213,39 @@ void rf_pa_init(void)
 
 void rf_pa_loop(void)
 {
-    static uint32_t last_tick = 0;
-    static uint32_t last_detector_change = 0;
-
-    if ((HAL_GetTick() - last_tick) >= 1) {
-      rf_detector = rf_detector * 0.999 + rf_pa_read_vdet_mv() * 0.001;
-      last_tick = HAL_GetTick();
+    static uint32_t last_detector_loop = 0;
+    static uint32_t last_control_loop = 0;
+    float pa_control_p;
+    float pa_control_d;
+    float pa_deviation;
+    
+    if ((HAL_GetTick() - last_detector_loop) >= 1) {
+      rf_detector = rf_detector * 0.99 + rf_pa_read_vdet_raw() * 0.01;
+      last_detector_loop = HAL_GetTick();
     }
 
-    if (rf_detector_target && !vtx_get_config()->pitmode) {
-      if ((HAL_GetTick() - last_detector_change) >= 1000)  {
+    if (vtx_get_config()->pitmode) {
+      pa_control_i = 0;
 
-        if (rf_detector < rf_detector_target * 0.985) {
-          rf_pa_set_vref_mv(g_vref_mv + 1);
-          last_detector_change = HAL_GetTick();
-          //TRACE_INFO("detector change %i \n", g_vref_mv);
-        } else if (rf_detector > rf_detector_target * 1.02) {
-          rf_pa_set_vref_mv(g_vref_mv - 1);
-          last_detector_change = HAL_GetTick();
-          //TRACE_INFO("detector change %i \n", g_vref_mv);
-        }
+    } else if (rf_detector_target) {
+      if ((HAL_GetTick() - last_control_loop) >= 5)  {
+        pa_deviation = rf_detector_target - rf_detector;
+        
+        pa_control_p = pa_deviation * PA_CONTROL_Kp;
+        pa_control_i += pa_deviation * PA_CONTROL_Ki;
+        pa_control_d = (pa_control_last_deviation - pa_deviation) * PA_CONTROL_Kd;
+
+        rf_pa_set_vref_mv(MAX(0,PA_CONTROL_OFFSET_MV + pa_control_i + pa_control_p + pa_control_d));
+        last_control_loop = HAL_GetTick();
+        pa_control_last_deviation  = pa_deviation;
       }
     }
 
+    #if 0
+    static uint32_t debug_tick = 0;
+    if ((HAL_GetTick() - debug_tick) >= 1000) {
+      TRACE_INFO("RF detect %.0f target %.0f  vref %i  i %f\n", rf_detector, rf_detector_target, g_vref_mv, control_i );
+      debug_tick = HAL_GetTick();
+    }
+    #endif
 }

@@ -36,3 +36,10 @@
 #define VIDEO2_INPUT_ENABLED                    true
 #define VIDEO2_INPUT_GAIN                       1
 
+// PA
+#define PA_CONTROL_Kp                           0.2
+#define PA_CONTROL_Ki                           0.009
+#define PA_CONTROL_Kd                           0.3
+
+#define PA_CONTROL_OFFSET_MV                    1600
+#define PA_LIMIT                                3000

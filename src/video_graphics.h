@@ -12,7 +12,7 @@
 
 #define VIDEO_WIDTH        (COLUMN_SIZE * 12U)
 #define VIDEO_HEIGHT       (288U)
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 #define VIDEO_BPP          (3U)
 #else
 #define VIDEO_BPP          (2U) 

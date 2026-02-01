@@ -42,7 +42,7 @@
 #define VIDEO2_INPUT_ENABLED                    true
 #define VIDEO2_INPUT_GAIN                       2
 
-#define USE_COLOR                               1
+#define USE_COLOR
 
 // PA
 #define PA_CONTROL_Kp                           0.2

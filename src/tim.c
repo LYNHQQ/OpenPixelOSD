@@ -167,7 +167,7 @@ void TIM2_Init(void)
     #endif
 }
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 void TIM3_Init(void)
 {
   LL_TIM_InitTypeDef TIM_InitStruct = {0};
@@ -414,7 +414,7 @@ void TIM17_Init(void)
     #endif
 }
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 void HRTIM1_Init(void)
 { 
 

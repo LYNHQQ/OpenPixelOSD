@@ -13,7 +13,7 @@
 #include "msp_fc.h"
 
 #define OSD_MENU_TOP                2
-#define OSD_MENU_TEXT_LEFT          ((COLUMN_SIZE - 26) / 2)
+#define OSD_MENU_TEXT_LEFT          ((COLUMN_SIZE - 24) / 2)
 #define OSD_MENU_VALUE_LEFT         (OSD_MENU_TEXT_LEFT + 14 )
 
 uint8_t tempChannel;

@@ -40,8 +40,35 @@
 #define MCU_TYPE "---------"
 #endif /* MCU_TYPE */
 
+#if defined(TARGET_PIXELVTX)
+#include "targets\pixelVTX.h"
+#elif defined(TARGET_PIXELVTX_COLOR)
+#include "targets\pixelVTXcolor.h"
+#else
+#include "targets\generic.h"
+#endif
+
+#if !(defined(STM32G474xx) && defined(USE_COLOR))
+#undef  USE_COLOR
+#define IF_USE_COLOR(...)                       { }
+#endif
+
+
+#if defined(USE_COLOR)
+#define IF_USE_COLOR(arg)                       arg
 #define ROW_SIZE                                16
-#define COLUMN_SIZE                             41
+#define COLUMN_SIZE                             30
+#define OPAMP_DELAY                             17
+#elif defined(USE_HD)
+#define ROW_SIZE                                32
+#define COLUMN_SIZE                             45
+#define OPAMP_DELAY                             7
+#else
+#define ROW_SIZE                                16
+#define COLUMN_SIZE                             30
+#define OPAMP_DELAY                             17
+#endif
+
 
 #define VISUAL_PICTURE_LINE_NS                  50000
 #define LINE_CENTER_NS                          31400
@@ -52,8 +79,6 @@
 #define TIM1_AUTORELOAD                         ((uint32_t)(VISUAL_PICTURE_LINE_TICKS_MAX / PIXELS_PER_LINE) - 1)
 #define VISUAL_PICTURE_LINE_TICKS               ((TIM1_AUTORELOAD + 1) * PIXELS_PER_LINE)
 #define LINE_START_DELAY                        (NS_TO_TICKS(LINE_CENTER_NS) - (VISUAL_PICTURE_LINE_TICKS) / 2)
-
-#define OPAMP_DELAY                             4
 
 #define BLACK_LEVEL_ADC_DELAY_NS                3300
 #define LOW_SYNC_ADC_DELAY_NS                   6000
@@ -128,27 +153,6 @@ typedef enum {
 
 #define BOXID_CAM_SWITCH                        MSP_BOXID_CAMERA_CONTROL_1
 
-
-#if defined(TARGET_PIXELVTX)
-#include "targets\pixelVTX.h"
-#elif defined(TARGET_PIXELVTX_COLOR)
-#include "targets\pixelVTXcolor.h"
-#else
-#include "targets\generic.h"
-#endif
-
-
-#if defined(STM32G474xx) && defined(USE_COLOR) && USE_COLOR == 1 
-#define IF_USE_COLOR(arg)        arg
-#undef  COLUMN_SIZE
-#define COLUMN_SIZE              30
-#undef  OPAMP_DELAY
-#define OPAMP_DELAY              17
-#else
-#define IF_USE_COLOR(...)        { }
-#undef  USE_COLOR
-#define USE_COLOR                0
-#endif
 
 #ifndef MAX
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))

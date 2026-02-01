@@ -36,7 +36,7 @@ uint8_t mspStickpos(void) {
 extern uint16_t triggerLine;
 extern videoMode_t videoMode;
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 extern uint32_t phase_val[2][10];
 extern float phaseOffset;
 void set_color_phase(videoMode_t mode);
@@ -109,7 +109,7 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             
             break;
         case 2:
-            #if USE_COLOR == 1
+            #ifdef USE_COLOR
             if (debug0) {
               LL_HRTIM_TIM_SetCompare1(HRTIM1, LL_HRTIM_TIMER_A, debug0);
               LL_HRTIM_TIM_SetCompare2(HRTIM1, LL_HRTIM_TIMER_A, (debug0 + debug2) % 1227);
@@ -125,6 +125,11 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             #endif
             break;
         case 4:
+            {
+              //char c = debug0;
+              //canvas_char_write(debug2, debug3, (const char*)&c, 1, 0);
+            }
+            break;
         case 5:
         case 6:
             LL_TIM_OC_SetCompareCH2(TIM1, debug0);
@@ -133,7 +138,7 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
         case 8:
         case 9:
             {
-              #if USE_COLOR == 1
+              #ifdef USE_COLOR
                 colorDelay = debug0;
                 LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
 

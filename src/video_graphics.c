@@ -161,7 +161,7 @@ EXEC_RAM void video_draw_char_at(char ch, uint16_t x, uint16_t y, px_t color)
 
 void video_graphics_draw_logo()
 {
-  #if USE_COLOR == 1
+  #ifdef USE_COLOR
   uint8_t colorMatrix[] = {6,1,7,5};
   #else
   uint8_t colorMatrix[] = {0,1,2,3};

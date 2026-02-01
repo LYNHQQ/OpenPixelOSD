@@ -101,7 +101,7 @@ uint8_t activeVideoInput;
 uint16_t dac_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
 uint32_t opamp_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 static uint32_t phase_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
 uint32_t phase_val[2][16] = {0};
 
@@ -154,7 +154,7 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
 #endif
 }
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 
 void set_color_system(videoMode_t mode)
 {
@@ -267,9 +267,9 @@ static void show_version(void)
 
     sprintf(str, "MCU: %s", MCU_TYPE);
     uint8_t col = (COLUMN_SIZE - strlen(str)) / 2;
-    canvas_char_write(col, 10, str, strlen(str), 0);
+    canvas_char_write(col, ROW_SIZE - 6, str, strlen(str), 0);
     sprintf(str, "FW: %s", FW_VERSION);
-    canvas_char_write(col, 9, str, strlen(str), 0);
+    canvas_char_write(col, ROW_SIZE - 7, str, strlen(str), 0);
     canvas_char_draw_complete();
 }
 
@@ -293,7 +293,7 @@ void video_overlay_init(void)
     COMP2_Init(); // COMP2 for video sync detection
     
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
     TIM3_Init();
     HRTIM1_Init();
 
@@ -384,17 +384,27 @@ EXEC_RAM static void squash_canvas_raw_pixel_buff(char c, uint32_t glyph_row, ui
     opamp_buff[buf_idx][x_off + FONT_WIDTH] = video_source;
 }
 
-void render_overlay_logo_line(uint16_t line)
+void render_overlay_logo_line(uint16_t line, uint8_t frame)
 {
     if (line >= maxRenderLine) return;
 
     // Logo line considering vertical offset
+
+    #ifdef USE_HD
+    if (((line<<1) + frame) < LOGO_OFFSET_Y * 3 || (((line<<1) + frame) - LOGO_OFFSET_Y * 3) >= LOGO_HEIGHT) {
+        // Line outside the logo area — do nothing, keep existing buffer contents
+        return;
+    }
+    uint16_t logo_row = ((line<<1) + frame) - LOGO_OFFSET_Y * 3;
+    #else
+    UNUSED(frame);
     if (line < LOGO_OFFSET_Y || (line - LOGO_OFFSET_Y) >= LOGO_HEIGHT) {
         // Line outside the logo area — do nothing, keep existing buffer contents
         return;
     }
-
     uint16_t logo_row = line - LOGO_OFFSET_Y;
+    #endif
+
     const uint8_t *logo_line_ptr = &logo_data[logo_row * LOGO_ROW_BYTES];
 
     uint32_t buf_idx_local = (PIXELS_PER_LINE -LOGO_WIDTH) / 2;
@@ -424,7 +434,7 @@ void render_overlay_logo_line(uint16_t line)
     }
 }
 
-EXEC_RAM static void render_line(uint16_t line)
+EXEC_RAM static void render_line(uint16_t line, uint8_t frame)
 {
     CCMRAM_BSS static uint32_t draw_line = 0;
     uint32_t map_row = 0;
@@ -437,8 +447,14 @@ EXEC_RAM static void render_line(uint16_t line)
     draw_line = line - minRenderLine;
 
     // Calculate which character row and which row in the glyph
+    #ifdef USE_HD
+    map_row    = ((draw_line<<1) + frame) / FONT_HEIGHT;  // 0..ROW_SIZE-1
+    glyph_row  = ((draw_line<<1) + frame) % FONT_HEIGHT;  // 0..FONT_HEIGHT-1
+    #else
+    UNUSED(frame);
     map_row    = draw_line / FONT_HEIGHT;  // 0..ROW_SIZE-1
     glyph_row  = draw_line % FONT_HEIGHT;  // 0..FONT_HEIGHT-1
+    #endif
 
     line_parity = draw_line & 1;
 
@@ -468,7 +484,7 @@ void render_test_pattern_line(uint16_t line)
 {
     if (line >= 105) return;
 
-    #if USE_COLOR == 1
+    #ifdef USE_COLOR
     uint32_t* phase;
     phase = phase_val[palPhase];
     #endif
@@ -550,7 +566,7 @@ EXEC_RAM void render_video_line(uint16_t line)
     luminance = &video_levels[0];
     opamp = &opa_vals[0];
 
-    #if USE_COLOR == 1
+    #ifdef USE_COLOR
     uint32_t* phase;
     phase = &phase_val[palPhase][0];
     phase_buff[buf_idx][0] = phase[2];
@@ -569,7 +585,7 @@ EXEC_RAM void render_video_line(uint16_t line)
       uint32_t word;
       uint8_t* byte = (uint8_t*)&word;
 
-      #if USE_COLOR == 1
+      #ifdef USE_COLOR
       if (show_test_pattern && (line < minRenderLine + 101)) {
           luminance = &video_levels[8];
           opamp = &opa_vals[8];
@@ -649,7 +665,7 @@ EXEC_RAM void render_video_line(uint16_t line)
 }
 #endif
 
-EXEC_RAM static void push_line_to_dma(uint16_t line)
+EXEC_RAM static void push_line_to_dma(uint16_t line, uint8_t frame)
 {
     #if DMA_DOUBLE_BUFFER == 0
       buf_idx = 0;
@@ -661,7 +677,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
     LL_TIM_DisableCounter(TIM1);
     LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
     LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-    #if USE_COLOR == 1
+    #ifdef USE_COLOR
     LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
     #endif
 
@@ -679,7 +695,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
       LL_DMA_EnableChannel(DMA2, LL_DMA_CHANNEL_1); // first start DAC channel
       LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_1);
 
-      #if USE_COLOR == 1
+      #ifdef USE_COLOR
       if(syncState == SYNC_STATE_EXTERNAL) {
         LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[buf_idx ^ DMA_DOUBLE_BUFFER][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
         LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
@@ -695,11 +711,11 @@ EXEC_RAM static void push_line_to_dma(uint16_t line)
 #if defined(HIGH_RAM)
     render_video_line(line); // video frame buffer
 #else
-    render_line(line); // char canvas map
+    render_line(line, frame); // char canvas map
     if (show_test_pattern) {
       //render_test_pattern_line(line);
     } else if (show_logo) {
-      render_overlay_logo_line(line);  
+      render_overlay_logo_line(line, frame);  
     }
 #endif
 }
@@ -711,6 +727,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
     CCMRAM_BSS static uint16_t videoLineFull = 0;
     CCMRAM_BSS static uint8_t vsync = 0;
     static uint8_t halfLine = 0;
+    static uint8_t frame = 0;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
     if(time_ns > 59.f && time_ns < 67.5f) {
@@ -722,7 +739,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         #endif
         if (video_line <= maxRenderLine) {
           if(syncState == SYNC_STATE_EXTERNAL) {
-            #if USE_COLOR == 1
+            #ifdef USE_COLOR
             // Detach line sync from COMP2
             LL_TIM_SetETRSource(TIM2, LL_TIM_TIM2_ETRSOURCE_COMP3);
             LL_TIM_SetRemap(TIM2, LL_TIM_TIM2_TI2_RMP_COMP3);
@@ -731,7 +748,7 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
             LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_EEV_1);
             #endif
           }
-          push_line_to_dma(video_line);
+          push_line_to_dma(video_line, frame);
         } else if (video_line == maxRenderLine + 1) {
           RGB_led_send();
         }
@@ -768,9 +785,11 @@ EXEC_RAM static inline void pars_video_signal(uint32_t tim_tick)
         if (vsync >= 4) {
           if(vsync == 5 ) {
             videoLineFull = 1;
+            frame = 1;
             halfLine = 1;
           } else {
             videoLineFull++;
+            frame = 0;
           }
           #ifdef TRIGGER_LINE
           led_set(TP2,videoLineFull == triggerLine);
@@ -849,7 +868,7 @@ EXEC_RAM void TIM2_IRQHandler(void)
                 video_gen_stop();
             }
             TRACE_INFO("Sync found\n");
-            #if USE_COLOR == 1
+            #ifdef USE_COLOR
             set_color_system(videoMode);
             set_color_phase(videoMode);
             #endif
@@ -872,13 +891,13 @@ EXEC_RAM void TIM2_IRQHandler(void)
       if(syncState == SYNC_STATE_EXTERNAL) {
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_1);
         LL_DMA_DisableChannel(DMA2, LL_DMA_CHANNEL_1);
-        #if USE_COLOR == 1
+        #ifdef USE_COLOR
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_8);
         #endif
         OPAMP1->CSR = video_source;
       }
       
-      #if USE_COLOR == 1
+      #ifdef USE_COLOR
       if(syncState == SYNC_STATE_EXTERNAL) {
         // Attach line sync to COMP2
         LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
@@ -891,7 +910,7 @@ EXEC_RAM void TIM2_IRQHandler(void)
     }
 }
 
-#if USE_COLOR == 1
+#ifdef USE_COLOR
 // Called from COMP2 & TIM3 event (video input)
 EXEC_RAM void TIM3_IRQHandler(void)
 {  

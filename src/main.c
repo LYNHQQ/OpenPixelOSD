@@ -23,7 +23,7 @@
 #include "dbgu.h"
 #endif
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
 #include "video_graphics.h"
 extern bool new_field;
 #endif
@@ -81,7 +81,7 @@ int main (void)
     settings_load();
     video_overlay_init();
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
     video_graphics_init();
     video_draw_text_system_font(FONT_SYSTEM_WIDTH * 2, VIDEO_HEIGHT - FONT_SYSTEM_HEIGHT, "WAITING MSP...");
     video_graphics_draw_complete();
@@ -112,7 +112,7 @@ int main (void)
 
 #if 0 // TODO: remove later
 // For test only - 3D cube animation
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
         if (new_field == false) {
             video_draw_3d_cube_animation();
         }

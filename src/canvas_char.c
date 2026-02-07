@@ -6,15 +6,13 @@
 #include <string.h>
 #include "canvas_char.h"
 #include "main.h"
-#if defined(HIGH_RAM)
+
+#if defined(USE_GRAPHICS)
 #include "video_graphics.h"
 
 #define FONT_WIDTH      (12)
 #define FONT_HEIGHT     (18)
 
-#endif
-
-#if defined(HIGH_RAM)
 EXEC_RAM void canvas_char_flush_map(void)
 {
     
@@ -27,14 +25,12 @@ EXEC_RAM void canvas_char_clean(void)
 
 EXEC_RAM void canvas_char_write(uint8_t x, uint8_t y, const char *data, const uint16_t len, uint8_t font)
 {
-    uint8_t fontColor[] = {PX_WHITE, PX_GREEN, PX_YELLOW, PX_RED};
-
     if (y >= ROW_SIZE) y = 0;
     if (x >= COLUMN_SIZE) x = 0;
 
     for (uint16_t i = 0; i < len; i++) {
         const uint8_t col = (x + i) % COLUMN_SIZE;
-        video_draw_char_at(data[i], col * FONT_WIDTH, y * FONT_HEIGHT, fontColor[font]);
+        video_draw_char_at(data[i], col * FONT_WIDTH, y * FONT_HEIGHT, font);
     }
 }
 
@@ -54,7 +50,7 @@ EXEC_RAM void canvas_print(uint8_t x, uint8_t y, const char *str) {
 
 
 #else
-CCMRAM_BSS char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
+CCMRAM_BSS canvasChar_t canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 CCMRAM_DATA uint8_t active_buffer = 0;
 CCMRAM_DATA uint8_t paint_buffer = 1;
 
@@ -78,7 +74,7 @@ EXEC_RAM void canvas_char_write(uint8_t x, uint8_t y, const char *data, const ui
 
     for (uint16_t i = 0; i < len; i++) {
         const uint8_t col = (x + i) % COLUMN_SIZE;
-        canvas_char_map[paint_buffer][y][col] = data[i];
+        canvas_char_map[paint_buffer][y][col] = data[i] | (font<<8);
     }
 }
 

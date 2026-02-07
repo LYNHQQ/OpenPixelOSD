@@ -90,7 +90,9 @@ EXEC_RAM bool msp_displayport_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16
                 break;
 
             case MSP_DISPLAYPORT_FONTCHAR_WRITE:
+                #ifndef USE_COLOR
                 update_font_symbol_write_bulk(payload[1], &payload[4], data_size - 4);
+                #endif
                 break;
 
             default:

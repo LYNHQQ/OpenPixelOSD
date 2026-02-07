@@ -48,25 +48,53 @@
 #include "targets\generic.h"
 #endif
 
-#if !(defined(STM32G474xx) && defined(USE_COLOR))
+#if defined(STM32G474xx) && defined(USE_COLOR)
+#define IF_USE_COLOR(arg)                       arg
+#else
 #undef  USE_COLOR
 #define IF_USE_COLOR(...)                       { }
 #endif
 
+#if !defined(STM32G474xx) 
+#undef  USE_GRAPHICS
+#endif
 
-#if defined(USE_COLOR)
-#define IF_USE_COLOR(arg)                       arg
-#define ROW_SIZE                                16
-#define COLUMN_SIZE                             30
-#define OPAMP_DELAY                             17
-#elif defined(USE_HD)
-#define ROW_SIZE                                32
+#if defined(USE_GRAPHICS) && defined(USE_COLOR)
+#undef USE_HD
+#define ROW_SIZE                                15
+#define COLUMN_SIZE                             32
+#define OPAMP_DELAY                             13
+#define COLOR_DELAY_PAL                         70
+#define COLOR_DELAY_NTSC                        88
+#elif defined(USE_GRAPHICS) && defined(USE_HD)
+#undef USE_HD
+#define ROW_SIZE                                15
 #define COLUMN_SIZE                             45
-#define OPAMP_DELAY                             7
+#define OPAMP_DELAY                             10
+#elif defined(USE_GRAPHICS)
+#define ROW_SIZE                                15
+#define COLUMN_SIZE                             32
+#define OPAMP_DELAY                             13
+#elif defined(USE_HD) && defined(USE_COLOR)
+#define ROW_SIZE                                30
+#define COLUMN_SIZE                             40
+#define OPAMP_DELAY                             10
+#define COLOR_DELAY_PAL                         70
+#define COLOR_DELAY_NTSC                        88
+#elif defined(USE_HD)
+#define ROW_SIZE                                30
+#define COLUMN_SIZE                             45
+#define OPAMP_DELAY                             6
+#elif defined(USE_COLOR)
+#define ROW_SIZE                                15
+#define COLUMN_SIZE                             36
+#define OPAMP_DELAY                             12
+#define COLOR_DELAY_PAL                         76
+#define COLOR_DELAY_NTSC                        88
 #else
-#define ROW_SIZE                                16
-#define COLUMN_SIZE                             30
-#define OPAMP_DELAY                             17
+#define ROW_SIZE                                15
+#define COLUMN_SIZE                             36
+#define OPAMP_DELAY                             16
 #endif
 
 

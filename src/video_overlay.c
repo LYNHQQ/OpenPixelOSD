@@ -13,8 +13,13 @@
 #include "canvas_char.h"
 #include "video_graphics.h"
 #include "led.h"
-#if defined(LOW_RAM)
+
+#if !defined(USE_GRAPHICS)
+#if defined(USE_COLOR)
+#include "fonts/font_bf_color.h"
+#else
 #include "fonts/font_bf_default.h"
+#endif
 #include "logo/logo.h"
 #endif
 
@@ -36,9 +41,6 @@
 #define HRTIM_RELOAD_PAL    1227
 #define HRTIM_RELOAD_NTSC   1520
 
-#define COLOR_DELAY_PAL     44
-#define COLOR_DELAY_NTSC    39
-
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
 
 #define MAX_RENDER_LINE_PAL   (303)
@@ -49,10 +51,10 @@
 
 #define BITMASK(n)          ((1U << (n)) - 1U)
 
-#if defined(LOW_RAM)
-#define DMA_DOUBLE_BUFFER   1
-#else
+#if defined(USE_GRAPHICS)
 #define DMA_DOUBLE_BUFFER   0
+#else
+#define DMA_DOUBLE_BUFFER   1
 #endif
 
 const colorMap_t colorMap[][16] =  { 
@@ -61,18 +63,19 @@ const colorMap_t colorMap[][16] =  {
                                       {0.0f,    700},     // white
                                       {0.0f,    245},     // grey 35%
                                       {240.7f,  440},     // green
-                                      {103.5f,  400},     // bright red
+                                      {103.5f,  300},     // bright red
                                       {347.1f,  150},     // bright blue
-                                      {167.1f,  620},     // yellow
-
-                                      {0.0f,      0},     // black
-                                      {-1.0f,   100},     // transparent
                                       {167.1f,  660},     // yellow
+
+                                      {139.3f,  470},     // amber
                                       {283.5f,  520},     // cyan
-                                      {240.7f,  440},     // green
                                       { 60.7f,  300},     // magenta
                                       {103.5f,  220},     // red
-                                      {347.1f,  100} }    // blue
+                                      {347.1f,  100},     // blue
+                                      {0.0f,    175},     // grey 25% 
+                                      {0.0f,    350},     // grey 50% 
+                                      {0.0f,    525}      // grey 75% 
+                                    }
                                   };
 
 uint8_t colorMapIdx = 0;
@@ -102,7 +105,7 @@ uint16_t dac_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ];   // DAC double buffer fo
 uint32_t opamp_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
 #ifdef USE_COLOR
-static uint32_t phase_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ + 4]; // double buffer for color phase  DMA WORLD/WORLD
+static uint32_t phase_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ + 8]; // double buffer for color phase  DMA WORLD/WORLD
 uint32_t phase_val[2][16] = {0};
 
 uint8_t palPhase = 0;
@@ -117,11 +120,11 @@ CCMRAM_DATA bool show_logo = true;
 CCMRAM_DATA bool show_test_pattern = false;
 CCMRAM_BSS bool new_field = false;
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
 extern uint8_t active_video_buffer;
 extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 #else
-extern char canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
+extern canvasChar_t canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
 #endif
 
 #ifdef TRIGGER_LINE
@@ -140,7 +143,7 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
     if (colorMap[colorMapIdx][x].phase > 0 && !video_gen_enabled) 
       video_levels[x] = new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance + OFFSET_COLOR_LUM);
     else
-      video_levels[x] = (new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance)) * VIDEO_TOTAL_GAIN;  
+      video_levels[x] = (new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance)) * VIDEO_TOTAL_GAIN;
   } 
 
 #ifdef ALPHA_CHANNEL
@@ -192,8 +195,8 @@ void set_color_phase(videoMode_t mode)
   } else {
     for (uint8_t x = 0; x<16; x++) {
       if (colorMap[colorMapIdx][x].phase > 0) {
-        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 670.0f - colorMap[colorMapIdx][x].phase - 135.0f) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
-        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 670.0f + colorMap[colorMapIdx][x].phase - 45.0f ) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
+        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 640.0f - colorMap[colorMapIdx][x].phase - 90.0f) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
+        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 640.0f + colorMap[colorMapIdx][x].phase        ) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
       } else if (colorMap[colorMapIdx][x].phase == 0) {
         phase_val[0][x] = 0;
         phase_val[1][x] = 0;
@@ -255,7 +258,11 @@ void set_video_mode(videoMode_t mode)
     maxRenderLine = MAX_RENDER_LINE_NTSC;
   } else {
     TRACE_INFO_WP("videoMode PAL\n");
-    minRenderLine = 14;
+    #if defined(USE_HD)
+    minRenderLine = MAX(14,158 - (ROW_SIZE * 9U) / 2);
+    #else
+    minRenderLine = MAX(14,158 - (ROW_SIZE * 9U));
+    #endif
     maxRenderLine = MAX_RENDER_LINE_PAL;
   }
 
@@ -278,7 +285,7 @@ void video_overlay_init(void)
     init_buffers();
     canvas_char_flush_map();
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
     video_graphics_init();
 #endif
 
@@ -363,26 +370,87 @@ void scan_sync_voltage() {
     LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
 }
 
-#if defined(LOW_RAM)
+#if !defined(USE_GRAPHICS)
+#if defined(USE_COLOR)
+static const uint8_t colorMatrix[4][16] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,2},
+                                            {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,4},
+                                            {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,7},
+                                            {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,5}
+                                          };
+
+EXEC_RAM static void squash_canvas_raw_pixel_buff(uint16_t c, uint32_t glyph_row, uint32_t x_off)
+{
+    uint8_t font_page = (c>>8) & 0x03;
+
+    const uint16_t * const glyph = &font_data[(uint8_t)c * FONT_STRIDE / 2];
+
+    #ifdef USE_COLOR
+    const uint32_t* phase = &phase_val[palPhase][0];
+    #endif
+
+    uint16_t buf_index = x_off;
+    uint32_t word_index = glyph_row * BYTES_PER_ROW / 2;
+    uint8_t pixel;
+    uint16_t word;
+
+    for(uint32_t col = 0; col < FONT_WIDTH / 4; col++) {
+        word = glyph[word_index++];
+        
+        pixel = colorMatrix[font_page][(word >> 12) & 0x0f];
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
+
+        pixel = colorMatrix[font_page][(word >> 8) & 0x0f];
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
+
+        pixel = colorMatrix[font_page][(word >> 4) & 0x0f];
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
+
+        pixel = colorMatrix[font_page][(word >> 0) & 0x0f];
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
+
+    }
+}
+
+#else
+
 EXEC_RAM static void squash_canvas_raw_pixel_buff(char c, uint32_t glyph_row, uint32_t x_off)
 {
     const uint8_t * const glyph = &font_data[(uint8_t)c * FONT_STRIDE];
-    const uint32_t row_offset = glyph_row * BYTES_PER_ROW;
 
-    for(uint32_t col = 0; col < FONT_WIDTH; col++) {
-        uint32_t bitpos     = col * FONT_BPP;
-        uint32_t byte_index = row_offset + (bitpos >> 3);
-        uint32_t bit_offset = bitpos & 0x7;
+    uint16_t buf_index = x_off;
+    uint32_t byte_index = glyph_row * BYTES_PER_ROW;
+    uint8_t pixel;
+    uint8_t byte;
 
-        uint8_t raw_byte = glyph[byte_index];
-        uint8_t pixel = (raw_byte >> (6 - bit_offset)) & 0x03;
+    for(uint32_t col = 0; col < FONT_WIDTH / 4; col++) {
+        byte = glyph[byte_index++];
+        
+        pixel = (byte >> 6) & 0x03;
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
 
-        dac_buff[buf_idx][x_off + col] = video_levels[pixel];
-        opamp_buff[buf_idx][x_off + col] = opa_vals[pixel];;
+        pixel = (byte >> 4) & 0x03;
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
 
+        pixel = (byte >> 2) & 0x03;
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
+
+        pixel = (byte >> 0) & 0x03;
+        dac_buff[buf_idx][buf_index] = video_levels[pixel];
+        opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
     }
-    opamp_buff[buf_idx][x_off + FONT_WIDTH] = video_source;
 }
+#endif
 
 void render_overlay_logo_line(uint16_t line, uint8_t frame)
 {
@@ -411,7 +479,7 @@ void render_overlay_logo_line(uint16_t line, uint8_t frame)
     for (uint32_t i = 0; i < LOGO_WIDTH>>2; i++) {
         uint8_t byte = logo_line_ptr[i];
         uint8_t pixel;
-    
+        
         if (buf_idx_local >= LINE_BUF_SZ) break;
         pixel = (byte >> 6) & 0x3;
         dac_buff[buf_idx][buf_idx_local] = video_levels[pixel];
@@ -439,9 +507,8 @@ EXEC_RAM static void render_line(uint16_t line, uint8_t frame)
     CCMRAM_BSS static uint32_t draw_line = 0;
     uint32_t map_row = 0;
     uint32_t glyph_row = 0;
-    uint32_t line_parity = 0;
     uint32_t i = 0;
-    char c = 0;
+    uint16_t c = 0;
 
     // Offset current draw line by Y_OFFSET
     draw_line = line - minRenderLine;
@@ -456,23 +523,27 @@ EXEC_RAM static void render_line(uint16_t line, uint8_t frame)
     glyph_row  = draw_line % FONT_HEIGHT;  // 0..FONT_HEIGHT-1
     #endif
 
-    line_parity = draw_line & 1;
-
     if (line < minRenderLine || map_row >= ROW_SIZE) {
         // Out of screen — just transparent
         for (i = 0; i < LINE_BUF_SZ; i++) {
-            dac_buff[line_parity][i] = video_levels[1];
-            opamp_buff[line_parity][i] = video_source;
+            dac_buff[buf_idx][i] = video_levels[1];
+            opamp_buff[buf_idx][i] = video_source;
         }
         return;
     }
 
-    dac_buff[line_parity][0] = video_levels[1];
-    opamp_buff[line_parity][0] = video_source;
+    dac_buff[buf_idx][0] = video_levels[1];
+    opamp_buff[buf_idx][0] = video_source;
+    
+    #ifdef USE_COLOR
+    uint32_t* phase;
+    phase = &phase_val[palPhase][0];
+    phase_buff[buf_idx][0] = phase[2];
+    #endif
 
     // Render each character of the map
     for (i = 0; i < COLUMN_SIZE; i++) {
-        c = canvas_char_map[active_buffer][map_row][i]; // draw previous char map buffer
+        c = canvas_char_map[active_buffer][map_row][i];
         squash_canvas_raw_pixel_buff(c, glyph_row, 1 + i * FONT_WIDTH);
     }
 
@@ -556,7 +627,7 @@ void render_test_pattern_line(uint16_t line)
     }
 }
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
 
 EXEC_RAM void render_video_line(uint16_t line)
 {
@@ -697,7 +768,7 @@ EXEC_RAM static void push_line_to_dma(uint16_t line, uint8_t frame)
 
       #ifdef USE_COLOR
       if(syncState == SYNC_STATE_EXTERNAL) {
-        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[buf_idx ^ DMA_DOUBLE_BUFFER][(colorDelay / TIM1_AUTORELOAD ) & 0x03]); // ! send previous buffer
+        LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_8, (uint32_t)&phase_buff[buf_idx ^ DMA_DOUBLE_BUFFER][(colorDelay / TIM1_AUTORELOAD ) & 0x07]); // ! send previous buffer
         LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_8, LINE_BUF_SZ);
         LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_8);
       }
@@ -708,7 +779,8 @@ EXEC_RAM static void push_line_to_dma(uint16_t line, uint8_t frame)
       LL_TIM_EnableDMAReq_CC2(TIM1);
     }
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
+    UNUSED(frame);
     render_video_line(line); // video frame buffer
 #else
     render_line(line, frame); // char canvas map
@@ -825,7 +897,7 @@ EXEC_RAM static inline void check_resync(uint32_t tim_tick)
     CCMRAM_BSS static uint8_t vsync = 0;
 
     register float time_ns = (float)tim_tick * TIM2_TICK_MS;
-    if (time_ns > 29.0f && time_ns < 35.0f) {
+    if (time_ns > 29.0f && time_ns < 33.5f) {
         vsync++;
     } else if (time_ns > 56.0f && time_ns < 58.0f) {
         if (vsync >= 4) {

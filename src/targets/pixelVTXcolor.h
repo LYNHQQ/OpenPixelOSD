@@ -43,6 +43,8 @@
 #define VIDEO2_INPUT_GAIN                       2
 
 #define USE_COLOR
+//#define USE_HD
+#define USE_GRAPHICS
 
 // PA
 #define PA_CONTROL_Kp                           0.2

@@ -36,6 +36,8 @@
 #define VIDEO2_INPUT_ENABLED                    true
 #define VIDEO2_INPUT_GAIN                       1
 
+#define USE_GRAPHICS
+
 // PA
 #define PA_CONTROL_Kp                           0.2
 #define PA_CONTROL_Ki                           0.009

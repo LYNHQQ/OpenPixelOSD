@@ -3,15 +3,22 @@
  * Copyright (C) 2025 Vitaliy N <vitaliy.nimych@gmail.com>
  */
 #include "video_graphics.h"
+#include "main.h"
 
-#if defined(HIGH_RAM)
+#if defined(USE_GRAPHICS)
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
 #include <string.h>
 #include "canvas_char.h"
+
+#if defined(USE_COLOR)
+#include "fonts/font_bf_color.h"
+#else
 #include "fonts/font_bf_default.h"
+#endif
+
 #include "fonts/font_system.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -120,40 +127,39 @@ EXEC_RAM static inline void vg_put_px2(uint16_t x, uint16_t y, uint8_t v2)
     line[byte] = (uint8_t)((line[byte] & ~mask) | ((v2 & 0x3u) << shift));
 }
 
+static const uint8_t colorMatrix[4][16] = { {0,1,2,3,4,5,6,7,2,2,2,2,2,2,2,2},
+                                            {0,1,2,3,4,5,6,7,2,2,2,2,2,2,2,4},
+                                            {0,1,2,3,4,5,6,7,2,2,2,2,2,2,2,7},
+                                            {0,1,2,3,4,5,6,7,2,2,2,2,2,2,2,5}
+                                          };
 
-EXEC_RAM void video_draw_char_at(char ch, uint16_t x, uint16_t y, px_t color)
+EXEC_RAM void video_draw_char_at(char ch, uint16_t x, uint16_t y, uint8_t font)
 {
-    /* Pointer auf Glyph-Daten */
-    const uint8_t *glyph = &font_data[(uint8_t)ch * FONT_STRIDE];
-    uint8_t colorMatrix[] = {0,1,color,4};
+    UNUSED(font);
+    //uint8_t fontColor[] = {PX_WHITE, PX_GREEN, PX_YELLOW, PX_RED};
+    const font_t *glyph = &font_data[(uint8_t)ch * FONT_STRIDE / sizeof(font_t)];
 
-    /* Jede Zeile des Zeichens durchlaufen */
     for (uint16_t glyph_row = 0; glyph_row < FONT_HEIGHT; glyph_row++) {
 
         uint16_t dst_y = y + glyph_row;
         if (dst_y >= VIDEO_HEIGHT) continue;
 
-        /* Offset der aktuellen Glyphen-Zeile */
-        uint32_t row_off = (uint32_t)glyph_row * (uint32_t)BYTES_PER_ROW;
+        uint32_t row_off = (uint32_t)glyph_row * (uint32_t)BYTES_PER_ROW / sizeof(font_t);
 
-        /* Jede Spalte (Pixel) der Glyphenbreite */
         for (uint16_t gx = 0; gx < FONT_WIDTH; gx++) {
 
             uint16_t dst_x = x + gx;
             if (dst_x >= VIDEO_WIDTH) continue;
 
-            /* Bitposition des Pixels im Glyph-Datenblock */
             uint32_t bitpos     = (uint32_t)gx * (uint32_t)FONT_BPP;
-            uint32_t byte_index = row_off + (bitpos >> 3);
-            uint32_t bit_offset = bitpos & 0x7;
+            uint32_t byte_index = row_off + (gx >> 2);
+            uint32_t bit_offset = bitpos & (FONT_BPP * 4 - 1);
 
-            uint8_t raw_byte = glyph[byte_index];
+            font_t raw_byte = glyph[byte_index];
 
-            /* 2-Bit-Pixel extrahieren (MSB-first) */
-            uint8_t px2 = (uint8_t)((raw_byte >> (6 - bit_offset)) & 0x03u);
+            uint8_t px2 = (font_t)((raw_byte >> (FONT_BPP * 3 - bit_offset)) & ((1<<FONT_BPP) - 1));
 
-            /* Pixel in den Video-Buffer schreiben */
-            video_draw_pixel(dst_x, dst_y, (px_t)colorMatrix[px2]);
+            video_draw_pixel(dst_x, dst_y, (px_t)colorMatrix[font][px2]);
         }
     }
 }

@@ -41,11 +41,11 @@
 #endif /* MCU_TYPE */
 
 #if defined(TARGET_PIXELVTX)
-#include "targets\pixelVTX.h"
+#include "targets/pixelVTX.h"
 #elif defined(TARGET_PIXELVTX_COLOR)
-#include "targets\pixelVTXcolor.h"
+#include "targets/pixelVTXcolor.h"
 #else
-#include "targets\generic.h"
+#include "targets/generic.h"
 #endif
 
 #if defined(STM32G474xx) && defined(USE_COLOR)

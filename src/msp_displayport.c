@@ -26,9 +26,6 @@ typedef enum {
     MSP_DISPLAYPORT_FONTCHAR_WRITE
 } msp_displayport_cmd_t;
 
-extern uint8_t active_buffer;
-extern uint8_t paint_buffer;
-extern bool show_logo;
 
 EXEC_RAM bool msp_displayport_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {

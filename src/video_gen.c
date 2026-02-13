@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "main.h"
 #include "video_gen.h"
+#include "video_overlay.h"
 
 #define INTERLACED_GEN        1
 
@@ -36,8 +37,6 @@
 #define LSYNC                 N_LSYNC, P_LSYNC
 #define HSYNC                 N_HSYNC, P_HSYNC
 #define HLSYNC                N_HSYNC, P_HLSYNC
-
-extern uint16_t sync_levels[];
 
 // Reverence timing, interlaced, progressive(non-interlaced) : https://martin.hinner.info/vga/pal.html
 #if INTERLACED_GEN

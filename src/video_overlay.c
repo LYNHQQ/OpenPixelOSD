@@ -13,6 +13,7 @@
 #include "canvas_char.h"
 #include "video_graphics.h"
 #include "led.h"
+#include "video_color.h"
 
 #if !defined(USE_GRAPHICS)
 #if defined(USE_COLOR)
@@ -33,13 +34,8 @@
 #define OPAMP_CONST_DAC     0x108000EDU  // Positive Input DAC1_OUT1 (internal DAC) Follower mode
 #define OPAMP_CONST_DAC_MOD 0x108200CDU  // Positive Input DAC1_OUT1 (internal DAC) non inverting gain =2 with VINM0 pin for input or bias
 
-#define LINE_BUF_SZ         (PIXELS_PER_LINE+2)
-
 #define OFFSET_SYNC         300
 #define OFFSET_COLOR_LUM    100
-
-#define HRTIM_RELOAD_PAL    1227
-#define HRTIM_RELOAD_NTSC   1520
 
 #define DAC_BLACK           DAC12BIT_FROM_MV(550)
 
@@ -51,34 +47,6 @@
 
 #define BITMASK(n)          ((1U << (n)) - 1U)
 
-#if defined(USE_GRAPHICS)
-#define DMA_DOUBLE_BUFFER   0
-#else
-#define DMA_DOUBLE_BUFFER   1
-#endif
-
-const colorMap_t colorMap[][16] =  { 
-                                    { {0.0f,    0},       // black
-                                      {-1.0f,   100},     // transparent
-                                      {0.0f,    700},     // white
-                                      {0.0f,    245},     // grey 35%
-                                      {240.7f,  440},     // green
-                                      {103.5f,  300},     // bright red
-                                      {347.1f,  150},     // bright blue
-                                      {167.1f,  660},     // yellow
-
-                                      {139.3f,  470},     // amber
-                                      {283.5f,  520},     // cyan
-                                      { 60.7f,  300},     // magenta
-                                      {103.5f,  220},     // red
-                                      {347.1f,  100},     // blue
-                                      {0.0f,    175},     // grey 25% 
-                                      {0.0f,    350},     // grey 50% 
-                                      {0.0f,    525}      // grey 75% 
-                                    }
-                                  };
-
-uint8_t colorMapIdx = 0;
 
 uint32_t opa_vals[16] = {OPAMP_CONST_DAC};
 uint16_t video_levels[16] = {0};
@@ -98,20 +66,12 @@ uint16_t minRenderLine = 14;
 uint16_t maxRenderLine = 0;
 
 const videoInput_t videoInputs[2] = { {LL_COMP_INPUT_PLUS_IO2, OPAMP_CONST_IO1, VIDEO1_INPUT_GAIN},
-                                {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
+                                      {LL_COMP_INPUT_PLUS_IO1, OPAMP_CONST_IO2, VIDEO2_INPUT_GAIN} };
 uint8_t activeVideoInput;
 
 uint16_t dac_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ];   // DAC double buffer for draw pixel (12-bit CH1)  DMA HALF_WORD/WORD
 uint32_t opamp_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ]; // double buffer for OPAMP1 multiplexer (32-bit)  DMA WORD/WORD
 
-#ifdef USE_COLOR
-static uint32_t phase_buff[1 + DMA_DOUBLE_BUFFER][LINE_BUF_SZ + 8]; // double buffer for color phase  DMA WORLD/WORLD
-uint32_t phase_val[2][16] = {0};
-
-uint8_t palPhase = 0;
-uint16_t colorDelay = 0;
-float phaseOffset = 0;
-#endif
 
 CCMRAM_BSS static bool buf_idx = 0; // current buffer index for double buffering
 CCMRAM_DATA static uint32_t video_source;
@@ -119,13 +79,6 @@ extern uint8_t active_buffer;
 CCMRAM_DATA bool show_logo = true;
 CCMRAM_DATA bool show_test_pattern = false;
 CCMRAM_BSS bool new_field = false;
-
-#if defined(USE_GRAPHICS)
-extern uint8_t active_video_buffer;
-extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
-#else
-extern canvasChar_t canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
-#endif
 
 #ifdef TRIGGER_LINE
 uint16_t triggerLine = TRIGGER_LINE;
@@ -138,7 +91,7 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
   else
     sync_levels[0] = 0;
   sync_levels[1] = new_level * VIDEO_TOTAL_GAIN;
-
+  
   for (uint8_t x = 0; x<16; x++) {
     if (colorMap[colorMapIdx][x].phase > 0 && !video_gen_enabled) 
       video_levels[x] = new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance + OFFSET_COLOR_LUM);
@@ -146,68 +99,7 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
       video_levels[x] = (new_level + DAC12BIT_FROM_MV(colorMap[colorMapIdx][x].luminance)) * VIDEO_TOTAL_GAIN;
   } 
 
-#ifdef ALPHA_CHANNEL
-  video_level[5] = new_level;
-  video_level[6] = new_level + DAC12BIT_FROM_MV(OFFSET_TRANSPARENT);
-  video_level[7] = new_level + DAC12BIT_FROM_MV(OFFSET_WHITE);
-  video_level[8] = new_level + DAC12BIT_FROM_MV(OFFSET_GREY);
-
-  LL_DAC_ConvertData12RightAligned(DAC1, LL_DAC_CHANNEL_1, new_level + DAC12BIT_FROM_MV(300));
-  LL_DAC_TrigSWConversion(DAC1, LL_DAC_CHANNEL_1);
-#endif
 }
-
-#ifdef USE_COLOR
-
-void set_color_system(videoMode_t mode)
-{
-  if (mode == MODE_NTSC) {
-    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, HRTIM_RELOAD_NTSC);
-    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, HRTIM_RELOAD_NTSC);
-    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, HRTIM_RELOAD_NTSC);
-    colorDelay = COLOR_DELAY_NTSC;
-  } else {
-    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_A, HRTIM_RELOAD_PAL);
-    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_B, HRTIM_RELOAD_PAL);
-    LL_HRTIM_TIM_SetPeriod(HRTIM1, LL_HRTIM_TIMER_C, HRTIM_RELOAD_PAL);
-    colorDelay = COLOR_DELAY_PAL;
-  }
-
-  LL_TIM_OC_SetCompareCH1(TIM1, TIM1_AUTORELOAD - (colorDelay % TIM1_AUTORELOAD));
-}
-
-void set_color_phase(videoMode_t mode)
-{
-  if (mode == MODE_NTSC) {
-    for (uint8_t x = 0; x<16; x++) {
-      if (colorMap[colorMapIdx][x].phase > 0) {
-        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 625.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC);
-        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 625.0f - colorMap[colorMapIdx][x].phase ) / 360 * HRTIM_RELOAD_NTSC) % HRTIM_RELOAD_NTSC);
-      } else if (colorMap[colorMapIdx][x].phase == 0) {
-        phase_val[0][x] = 0;
-        phase_val[1][x] = 0;
-      } else {
-        phase_val[0][x] = 0;
-        phase_val[1][x] = 0;
-      }
-    }
-
-  } else {
-    for (uint8_t x = 0; x<16; x++) {
-      if (colorMap[colorMapIdx][x].phase > 0) {
-        phase_val[0][x] = MAX(32,(uint16_t)((phaseOffset + 640.0f - colorMap[colorMapIdx][x].phase - 90.0f) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
-        phase_val[1][x] = MAX(32,(uint16_t)((phaseOffset + 640.0f + colorMap[colorMapIdx][x].phase        ) / 360 * HRTIM_RELOAD_PAL) % HRTIM_RELOAD_PAL);
-      } else if (colorMap[colorMapIdx][x].phase == 0) {
-        phase_val[0][x] = 0;
-        phase_val[1][x] = 0;
-      } else {
-        phase_val[0][x] = 0;
-        phase_val[1][x] = 0;
-      }
-    }
-  }
-}
-#endif
 
 EXEC_RAM static void init_buffers()
 {
@@ -289,6 +181,10 @@ void video_overlay_init(void)
     video_graphics_init();
 #endif
 
+#ifdef USE_COLOR
+    video_color_init();
+#endif
+
     DAC1_Init(); // DAC1_CH1 for video detection
     DAC3_Init(); // DAC3_CH1 for render line
     OPAMP1_Init(); // OPAMP1 as multiplexer for video source selection
@@ -299,22 +195,6 @@ void video_overlay_init(void)
     TIM17_Init(); // TIM17 for video generator
     COMP2_Init(); // COMP2 for video sync detection
     
-
-#ifdef USE_COLOR
-    TIM3_Init();
-    HRTIM1_Init();
-
-    LL_TIM_EnableIT_CC1(TIM3);
-    LL_TIM_EnableIT_UPDATE(TIM3);
-    LL_TIM_EnableCounter(TIM3);
-    LL_TIM_CC_EnableChannel(TIM3, LL_TIM_CHANNEL_CH1);
-#endif
-
-#if defined(ALPHA_CHANNEL) && defined(STM32G474xx)
-    OPAMP6_Init();
-    LL_OPAMP_Enable(OPAMP6);
-#endif
-
     LL_OPAMP_Enable(OPAMP1);
 
     LL_COMP_Enable(COMP2);
@@ -370,8 +250,118 @@ void scan_sync_voltage() {
     LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_2, DAC12BIT_FROM_MV(sync_voltage) * videoInputs[activeVideoInput].gain);
 }
 
-#if !defined(USE_GRAPHICS)
+#if defined(USE_GRAPHICS)
+
+EXEC_RAM void render_video_line(uint16_t line)
+{
+    uint16_t* luminance;
+    uint32_t* opamp;
+
+    luminance = &video_levels[0];
+    opamp = &opa_vals[0];
+
+    #ifdef USE_COLOR
+    uint32_t* phase;
+    phase = &phase_val[palPhase][0];
+    phase_buff[buf_idx][0] = phase[2];
+    #endif
+
+    if ((line < minRenderLine) || line >= minRenderLine + VIDEO_HEIGHT) {
+      for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
+        dac_buff[buf_idx][i] = luminance[1];
+        opamp_buff[buf_idx][i] = video_source;
+        IF_USE_COLOR(phase_buff[buf_idx][i] = phase[1]);
+      }
+    } else {
+      uint8_t *line_ptr = video_frame_buffer[active_video_buffer][line - minRenderLine];
+
+      uint32_t buf_idx_local = 0;
+      uint32_t word;
+      uint8_t* byte = (uint8_t*)&word;
+
+      #ifdef USE_COLOR
+      if (show_test_pattern && (line < minRenderLine + 101)) {
+          luminance = &video_levels[8];
+          opamp = &opa_vals[8];
+          phase = &phase_val[palPhase][8];
+      }
+      #endif
+
+      dac_buff[buf_idx][buf_idx_local] = video_levels[1];
+      IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[1]);
+      opamp_buff[buf_idx][buf_idx_local++] = opa_vals[1];
+
+      for (uint32_t i = 0; i < VIDEO_BYTES_PER_LINE; i += VIDEO_BPP) {
+          #if VIDEO_BPP > 3
+          byte[3] = line_ptr[i + VIDEO_BPP - 4];
+          #endif
+          #if VIDEO_BPP > 2
+          byte[2] = line_ptr[i + VIDEO_BPP - 3];
+          #endif
+          #if VIDEO_BPP > 1
+          byte[1] = line_ptr[i + VIDEO_BPP - 2];
+          #endif
+          byte[0] = line_ptr[i + VIDEO_BPP - 1];
+          
+          uint8_t pixel;
+      
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 7)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 6)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 5)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 4)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 3)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 2)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = (word >> (VIDEO_BPP * 1)) & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+
+          if (buf_idx_local >= LINE_BUF_SZ) break;
+          pixel = word & BITMASK(VIDEO_BPP);
+          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
+          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
+          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
+      }
+      dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
+      opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
+    }
+}
+
+#else
+
 #if defined(USE_COLOR)
+
 static const uint8_t colorMatrix[4][16] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,2},
                                             {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,4},
                                             {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,7},
@@ -383,10 +373,7 @@ EXEC_RAM static void squash_canvas_raw_pixel_buff(uint16_t c, uint32_t glyph_row
     uint8_t font_page = (c>>8) & 0x03;
 
     const uint16_t * const glyph = &font_data[(uint8_t)c * FONT_STRIDE / 2];
-
-    #ifdef USE_COLOR
     const uint32_t* phase = &phase_val[palPhase][0];
-    #endif
 
     uint16_t buf_index = x_off;
     uint32_t word_index = glyph_row * BYTES_PER_ROW / 2;
@@ -398,24 +385,23 @@ EXEC_RAM static void squash_canvas_raw_pixel_buff(uint16_t c, uint32_t glyph_row
         
         pixel = colorMatrix[font_page][(word >> 12) & 0x0f];
         dac_buff[buf_idx][buf_index] = video_levels[pixel];
-        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        phase_buff[buf_idx][buf_index] = phase[pixel];
         opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
 
         pixel = colorMatrix[font_page][(word >> 8) & 0x0f];
         dac_buff[buf_idx][buf_index] = video_levels[pixel];
-        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        phase_buff[buf_idx][buf_index] = phase[pixel];
         opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
 
         pixel = colorMatrix[font_page][(word >> 4) & 0x0f];
         dac_buff[buf_idx][buf_index] = video_levels[pixel];
-        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        phase_buff[buf_idx][buf_index] = phase[pixel];
         opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
 
         pixel = colorMatrix[font_page][(word >> 0) & 0x0f];
         dac_buff[buf_idx][buf_index] = video_levels[pixel];
-        IF_USE_COLOR(phase_buff[buf_idx][buf_index] = phase[pixel]);
+        phase_buff[buf_idx][buf_index] = phase[pixel];
         opamp_buff[buf_idx][buf_index++] = opa_vals[pixel];
-
     }
 }
 
@@ -551,6 +537,7 @@ EXEC_RAM static void render_line(uint16_t line, uint8_t frame)
 }
 #endif
 
+#if 0
 void render_test_pattern_line(uint16_t line)
 {
     if (line >= 105) return;
@@ -622,114 +609,6 @@ void render_test_pattern_line(uint16_t line)
       }
 
       IF_USE_COLOR(phase_buff[buf_idx][LINE_BUF_SZ-1] = phase[1]);
-      dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
-      opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
-    }
-}
-
-#if defined(USE_GRAPHICS)
-
-EXEC_RAM void render_video_line(uint16_t line)
-{
-    uint16_t* luminance;
-    uint32_t* opamp;
-
-    luminance = &video_levels[0];
-    opamp = &opa_vals[0];
-
-    #ifdef USE_COLOR
-    uint32_t* phase;
-    phase = &phase_val[palPhase][0];
-    phase_buff[buf_idx][0] = phase[2];
-    #endif
-
-    if ((line < minRenderLine) || line >= minRenderLine + VIDEO_HEIGHT) {
-      for (uint16_t i = 0; i < LINE_BUF_SZ; i++ ) {
-        dac_buff[buf_idx][i] = luminance[1];
-        opamp_buff[buf_idx][i] = video_source;
-        IF_USE_COLOR(phase_buff[buf_idx][i] = phase[1]);
-      }
-    } else {
-      uint8_t *line_ptr = video_frame_buffer[active_video_buffer][line - minRenderLine];
-
-      uint32_t buf_idx_local = 0;
-      uint32_t word;
-      uint8_t* byte = (uint8_t*)&word;
-
-      #ifdef USE_COLOR
-      if (show_test_pattern && (line < minRenderLine + 101)) {
-          luminance = &video_levels[8];
-          opamp = &opa_vals[8];
-          phase = &phase_val[palPhase][8];
-      }
-      #endif
-
-      dac_buff[buf_idx][buf_idx_local] = video_levels[1];
-      IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[1]);
-      opamp_buff[buf_idx][buf_idx_local++] = opa_vals[1];
-
-      for (uint32_t i = 0; i < VIDEO_BYTES_PER_LINE; i += VIDEO_BPP) {
-          #if VIDEO_BPP > 3
-          byte[3] = line_ptr[i + VIDEO_BPP - 4];
-          #endif
-          #if VIDEO_BPP > 2
-          byte[2] = line_ptr[i + VIDEO_BPP - 3];
-          #endif
-          #if VIDEO_BPP > 1
-          byte[1] = line_ptr[i + VIDEO_BPP - 2];
-          #endif
-          byte[0] = line_ptr[i + VIDEO_BPP - 1];
-          
-          uint8_t pixel;
-      
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 7)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 6)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 5)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 4)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 3)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 2)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = (word >> (VIDEO_BPP * 1)) & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-
-          if (buf_idx_local >= LINE_BUF_SZ) break;
-          pixel = word & BITMASK(VIDEO_BPP);
-          dac_buff[buf_idx][buf_idx_local] = luminance[pixel];
-          IF_USE_COLOR(phase_buff[buf_idx][buf_idx_local] = phase[pixel]);
-          opamp_buff[buf_idx][buf_idx_local++] = opamp[pixel];
-      }
       dac_buff[buf_idx][LINE_BUF_SZ-1] = video_levels[1];
       opamp_buff[buf_idx][LINE_BUF_SZ-1] = video_source;
     }
@@ -981,41 +860,6 @@ EXEC_RAM void TIM2_IRQHandler(void)
       LL_TIM_ClearFlag_CC3(TIM2);
     }
 }
-
-#ifdef USE_COLOR
-// Called from COMP2 & TIM3 event (video input)
-EXEC_RAM void TIM3_IRQHandler(void)
-{  
-  static uint8_t phase = 0;
-
-  if (LL_TIM_IsActiveFlag_UPDATE(TIM3)) {
-    palPhase = phase;
-    // Stop synchronizing HRTIM TIMER C with TIMER B
-    LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_C, LL_HRTIM_RESETTRIG_NONE);
-    LL_TIM_ClearFlag_UPDATE(TIM3);
-  }
-
-  if (LL_TIM_IsActiveFlag_CC1(TIM3)) {
-    if(LL_HRTIM_TIM_GetResetTrig(HRTIM1, LL_HRTIM_TIMER_B) == LL_HRTIM_RESETTRIG_EEV_1) {
-      // Close trigger gate for HRTIM TIMER B colorbust synchronisation
-      LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_B, LL_HRTIM_RESETTRIG_NONE);
-
-      //Determine PAL phase
-      if(LL_HRTIM_TIM_GetCapture1(HRTIM1, LL_HRTIM_TIMER_B) > (HRTIM_RELOAD_PAL / 2) ) {
-        phase = 1 ^ DMA_DOUBLE_BUFFER;
-      } else {
-        phase = 0 ^ DMA_DOUBLE_BUFFER;
-      }
-
-      // Start synchronizing HRTIM TIMER C with TIMER B
-      LL_HRTIM_TIM_SetResetTrig(HRTIM1, LL_HRTIM_TIMER_C, LL_HRTIM_RESETTRIG_OTHER2_CMP2); 
-    }
-
-    LL_TIM_ClearFlag_CC1(TIM3);
-  }
-  
-}
-#endif
 
 // Called form TIM17 event (video gen)
 EXEC_RAM void TIM1_TRG_COM_TIM17_IRQHandler(void)

@@ -20,8 +20,6 @@ uint8_t tempChannel;
 uint8_t tempBand;
 uint8_t tempVideoInput;
 
-extern CCMRAM_DATA bool show_logo;
-
 void printMenuValueVtx(uint8_t x, uint8_t y, uint8_t idx);
 void printMenuValue(uint8_t x, uint8_t y, uint8_t idx);
 void changeChannel(ButtonEvent_e btn, uint8_t idx);

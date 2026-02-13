@@ -13,6 +13,8 @@ typedef uint16_t canvasChar_t;
 typedef char canvasChar_t;
 #endif
 
+extern canvasChar_t canvas_char_map[2][ROW_SIZE][COLUMN_SIZE];
+
 EXEC_RAM void canvas_char_flush_map(void);
 EXEC_RAM void canvas_char_clean(void);
 EXEC_RAM void canvas_char_write(uint8_t x, uint8_t y, const char *data, const uint16_t len, uint8_t font);

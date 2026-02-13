@@ -3,6 +3,7 @@
  * Copyright (C) 2025 Vitaliy N <vitaliy.nimych@gmail.com>
  */
 #include "main.h"
+#include "video_overlay.h"
 
 void TIM1_Init(void)
 {
@@ -340,8 +341,6 @@ void TIM15_Init(void)
 
 void TIM17_Init(void)
 {
-    extern uint16_t video_levels[5];
-
     LL_TIM_InitTypeDef TIM_InitStruct = {0};
     LL_TIM_OC_InitTypeDef TIM_OC_InitStruct = {0};
 

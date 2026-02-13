@@ -5,6 +5,17 @@
 #ifndef VIDEO_OVERLAY_H
 #define VIDEO_OVERLAY_H
 
+#include "main.h"
+#include <stdbool.h>
+
+#define LINE_BUF_SZ         (PIXELS_PER_LINE+2)
+
+#if defined(USE_GRAPHICS)
+#define DMA_DOUBLE_BUFFER   0
+#else
+#define DMA_DOUBLE_BUFFER   1
+#endif
+
 typedef enum {
   OFF,
   INTERNAL,
@@ -44,6 +55,10 @@ typedef struct {
 } colorMap_t;
 
 extern osdState_e osdState;
+extern bool show_logo;
+extern bool show_test_pattern;
+extern uint16_t video_levels[];
+extern uint16_t sync_levels[];
 
 void set_video_input(uint8_t input);
 void video_overlay_init(void);

@@ -12,6 +12,7 @@
 #include <math.h>
 #include <string.h>
 #include "canvas_char.h"
+#include "video_overlay.h"
 
 #if defined(USE_COLOR)
 #include "fonts/font_bf_color.h"
@@ -30,9 +31,6 @@
 #endif
 
 #define LOGO_OFFSET_Y       (25)
-
-extern bool show_logo;
-extern bool show_test_pattern;
 
 uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
 CCMRAM_DATA uint8_t active_video_buffer = 0;

@@ -37,7 +37,6 @@ void logo_timeout_check(void);
 
 extern volatile uint16_t sync_voltage;
 extern uint16_t sync_voltage_low;
-extern uint16_t sync_levels[];
 #if defined(BUILD_VARIANT_VTX)
 extern double rf_detector;
 #endif
@@ -137,7 +136,6 @@ void logo_timeout_check(void)
 {
     static uint32_t boot_time = 0;
     static bool timeout_checked = false;
-    extern bool show_logo;
 
     // Initialize boot time on first call
     if (boot_time == 0) {

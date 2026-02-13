@@ -20,6 +20,9 @@
 #endif
 #define VIDEO_BYTES_PER_LINE ((VIDEO_WIDTH * VIDEO_BPP) / 8U)
 
+extern uint8_t active_video_buffer;
+extern uint8_t video_frame_buffer[2][VIDEO_HEIGHT][VIDEO_BYTES_PER_LINE];
+
 void video_graphics_init(void);
 void video_draw_pixel(uint16_t x, uint16_t y, px_t color);
 void video_draw_line(int x0, int y0, int x1, int y1, px_t color);

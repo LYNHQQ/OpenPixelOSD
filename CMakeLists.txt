@@ -188,6 +188,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         ./src/uart.c
         ./src/usb.c
         ./src/flash.c
+        ./src/video_color.c
         ./src/video_gen.c
         ./src/video_overlay.c
         ./src/canvas_char.c

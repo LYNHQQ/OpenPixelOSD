@@ -1,11 +1,11 @@
 #pragma once
 
 #if defined(TARGET_PIXELVTX)
-#include "targets\pixelVTX.h"
+#include "targets/pixelVTX.h"
 #elif defined(TARGET_PIXELVTX_COLOR)
-#include "targets\pixelVTXcolor.h"
+#include "targets/pixelVTXcolor.h"
 #elif defined(TARGET_GENERIC_VTX)
-#include "targets\genericVTX.h"
+#include "targets/genericVTX.h"
 #else
-#include "targets\generic.h"
+#include "targets/generic.h"
 #endif

@@ -101,7 +101,7 @@ EXEC_RAM static void set_black_level(uint32_t new_level)
 
 }
 
-EXEC_RAM static void init_buffers()
+static void init_buffers()
 {
     for(uint8_t b = 0; b <= DMA_DOUBLE_BUFFER; b++) {
       for (uint32_t j = 0; j < LINE_BUF_SZ; j++) {
@@ -112,7 +112,7 @@ EXEC_RAM static void init_buffers()
     }
 }
 
-EXEC_RAM static void set_video_source(uint32_t source)
+static void set_video_source(uint32_t source)
 {
   video_source = source;
   for (uint8_t x = 0; x<16; x++) {

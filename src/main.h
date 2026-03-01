@@ -22,6 +22,7 @@
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_adc.h"
 #include "trace.h"
+#include "targets/target.h"
 
 #ifndef GIT_TAG
 #define GIT_TAG "-.-.-"
@@ -39,14 +40,6 @@
 #ifndef MCU_TYPE
 #define MCU_TYPE "---------"
 #endif /* MCU_TYPE */
-
-#if defined(TARGET_PIXELVTX)
-#include "targets\pixelVTX.h"
-#elif defined(TARGET_PIXELVTX_COLOR)
-#include "targets\pixelVTXcolor.h"
-#else
-#include "targets\generic.h"
-#endif
 
 #if defined(STM32G474xx) && defined(USE_COLOR)
 #define IF_USE_COLOR(arg)                       arg

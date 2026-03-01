@@ -33,10 +33,12 @@ void adc_init(void)
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(ADC_RESERVED_GPIO_Port, &GPIO_InitStruct);
 
+#if defined(ADC_PA_VDET_Pin)
     GPIO_InitStruct.Pin = ADC_PA_VDET_Pin;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
     LL_GPIO_Init(ADC_PA_VDET_GPIO_Port, &GPIO_InitStruct);
+#endif
 
     /* ADC1 DMA Init */
 
@@ -113,10 +115,12 @@ void adc_init(void)
     LL_ADC_SetChannelSamplingTime(ADC1, ADC_RESERVED_Channel, LL_ADC_SAMPLINGTIME_92CYCLES_5);
     LL_ADC_SetChannelSingleDiff(ADC1, ADC_RESERVED_Channel, LL_ADC_SINGLE_ENDED);
 
+#if defined(ADC_PA_VDET_Channel)
     /** Configure Regular Channel */
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_2, ADC_PA_VDET_Channel );
     LL_ADC_SetChannelSamplingTime(ADC1, ADC_PA_VDET_Channel , LL_ADC_SAMPLINGTIME_247CYCLES_5);
     LL_ADC_SetChannelSingleDiff(ADC1, ADC_PA_VDET_Channel , LL_ADC_SINGLE_ENDED);
+#endif
 
     /** Configure Regular Channel */
     LL_ADC_REG_SetSequencerRanks(ADC1, LL_ADC_REG_RANK_3, LL_ADC_CHANNEL_TEMPSENSOR_ADC1);

@@ -13,7 +13,7 @@
 #include "uart.h"
 #include "usb.h"
 
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
 #include "vtx_msp.h"
 #endif
 
@@ -56,7 +56,7 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
     case MSP_PACALIBRATION:
     case MSP_SET_PACALIBRATION:
     case MSP_EEPROM_WRITE:
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
         vtx_msp_handle_msp(owner, msp_cmd, data_size, payload);
 #endif
         break;
@@ -392,7 +392,7 @@ EXEC_RAM void msp_loop_process(void)
             c = c + (!fc.status.armed);
             break;
           case 3:
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
             if (!vtx_get_config()->configSet) {
               if(configRequest) {
                 vtx_msp_request_config(MSP_OWNER_UART);

@@ -5,6 +5,8 @@
 #include "rtc6705.h"
 #include "main.h"
 
+#if defined(USE_VTX)
+
 #include <rf_pa.h>
 
 /** rtc6705.c  — Bit-banged 3-wire interface for RTC6705
@@ -451,3 +453,4 @@ static bool rtc6705_detect(void)
                      ((s2 & hi_mask) == (s3 & hi_mask));
     return hi_stable;
 }
+#endif

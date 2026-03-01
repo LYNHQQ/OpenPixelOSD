@@ -1,5 +1,7 @@
 #pragma once
 
+#define USE_VTX
+#define USE_HD
 
 #define SPI2_CS_Pin                             LL_GPIO_PIN_7
 #define SPI2_CS_GPIO_Port                       GPIOB
@@ -42,7 +44,6 @@
 #define VIDEO2_INPUT_ENABLED                    true
 #define VIDEO2_INPUT_GAIN                       1
 
-#define USE_HD
 
 // PA
 #define PA_CONTROL_Kp                           0.2
@@ -51,3 +52,32 @@
 
 #define PA_CONTROL_OFFSET_MV                    1600
 #define PA_LIMIT                                3000
+
+#define POWER_TABLE     { {0,  {' ', ' ', '0'}, RTC6705_PA_3dBm,  { 5650, 5700, 5750, 5800, 5850, 5900, 5950 },  \
+                                                                  {    0,    0,    0,    0,    0,    0,    0 }}, \
+                          {1,  {' ', ' ', '1'}, RTC6705_PA_3dBm,  {    1,    1,    1,    1,    1,    1,    1 },  \
+                                                                  {    0,    0,    0,    0,    0,    0,    0 }}, \
+                          {10, {' ', '1', '0'}, RTC6705_PA_3dBm,  {    1,    1,    1,    1,    1,    1,    1 },  \
+                                                                  {    0,    0,    0,    0,    0,    0,    0 }}, \
+                          {25, {' ', '2', '5'}, RTC6705_PA_3dBm,  {    1,    1,    1,    1,    1,    1,    1 },  \
+                                                                  {    0,    0,    0,    0,    0,    0,    0 }}, \
+                          {50, {' ', '5', '0'}, RTC6705_PA_3dBm,  {    1,    1,    1,    1,    1,    1,    1 },  \
+                                                                  {    0,    0,    0,    0,    0,    0,    0 }}, \
+                        }
+
+                        /* VTX bands table (letter + 8-char name + 8 channel freqs (MHz)).
+                        * These are standard bands used in Betaflight and iNav.
+                        * You can add custom bands here if needed. */
+#define BAND_TABLE      { /* Band A (Boscam A) */                           \
+                          { 'A', { 'B','O','S','C','A','M',' ','A' },       \
+                            { 5865,5845,5825,5805,5785,5765,5745,5725 } },  \
+                          /* Band B (Boscam B) */                           \
+                          { 'B', { 'B','O','S','C','A','M',' ','B' },       \
+                            { 5733,5752,5771,5790,5809,5828,5847,5866 } },  \
+                          /* Band F (FatShark) */                           \
+                          { 'F', { 'F','A','T','S','H','A','R','K' },       \
+                            { 5740,5760,5780,5800,5820,5840,5860,5880 } },  \
+                          /* Band R (Raceband) */                           \
+                          { 'R', { 'R','A','C','E','B','A','N','D' },       \
+                            { 5658,5695,5732,5769,5806,5843,5880,5917 } },  \
+                        }

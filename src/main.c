@@ -13,7 +13,7 @@
 #include "led.h"
 #include "settings.h"
 #include "settingsMenu.h"
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
 #include "rtc6705.h"
 #include "rf_pa.h"
 #include "vtx_msp.h"
@@ -37,7 +37,7 @@ void logo_timeout_check(void);
 
 extern volatile uint16_t sync_voltage;
 extern uint16_t sync_voltage_low;
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
 extern double rf_detector;
 #endif
 
@@ -47,7 +47,7 @@ void debug_print_loop(void)
 
     if ((HAL_GetTick() - last_tick) >= DEBUG_LOOP_INTERVAL) {
         last_tick = HAL_GetTick();
-        #if defined(BUILD_VARIANT_VTX)
+        #if defined(USE_VTX)
         TRACE_CMD(uint16_t rf_detect_int = rf_detector);
         #else
         uint16_t rf_detect_int =0;
@@ -87,7 +87,7 @@ int main (void)
 #endif
     msp_init();
 
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
     rf_pa_init();
     if(rtc6705_init()) {
         printf("rtc6705 detected\r\n");
@@ -105,7 +105,7 @@ int main (void)
         video_sync_loop();
         msp_menu();
 
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
         rf_pa_loop();
 #endif
 

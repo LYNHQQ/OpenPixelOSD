@@ -3,7 +3,7 @@
 
 #include "settingsMenu.h"
 #include "settings.h"
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
 #include "vtx_msp.h"
 #include "rf_pa.h"
 #endif
@@ -43,7 +43,7 @@ typedef enum {
 } menuIdx_t;
 
 osdEntry_t osdMenue[] = { 
-                          #if defined(BUILD_VARIANT_VTX)
+                          #if defined(USE_VTX)
                           {MENU_BAND,         "BAND",        (osdPrintFuncPtr)printMenuValueVtx, (osdKeyFuncPtr)changeChannel},
                           {MENU_CHANNEL,      "CHANNEL",     (osdPrintFuncPtr)printMenuValueVtx, (osdKeyFuncPtr)changeChannel},
                           {MENU_FREQUENCY,    "FREQUENCY",   (osdPrintFuncPtr)printMenuValueVtx, NULL},
@@ -59,7 +59,7 @@ osdEntry_t osdMenue[] = {
 
 #define MENUE_SIZE        (sizeof(osdMenue) / sizeof(osdMenue[0]))
 
-#if defined(BUILD_VARIANT_VTX)
+#if defined(USE_VTX)
 void printMenuValueVtx(uint8_t x, uint8_t y, uint8_t idx) {
   char buffer[20] = {0};
 
@@ -187,7 +187,7 @@ void exitVtxMenu(ButtonEvent_e btn, uint8_t idx) {
   if (btn == BTN_RIGHT) {
     osdState = OSD_EXIT_MENU;
     if (idx == MENU_SAVE_EXIT) {
-      #if defined(BUILD_VARIANT_VTX)
+      #if defined(USE_VTX)
       vtx_set_band_channel(tempBand, tempChannel);
       #endif
       settings_save();
@@ -216,7 +216,7 @@ void msp_menu(void) {
     osdState = OSD_MENU;
     selectedEntry = 0;
     btnLast = BTN_INVALID;
-    #if defined(BUILD_VARIANT_VTX)
+    #if defined(USE_VTX)
     tempChannel = vtx_get_config()->channel;
     tempBand = vtx_get_config()->band;
     #endif

@@ -7,6 +7,26 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+                              /* VTX bands table (letter + 8-char name + 8 channel freqs (MHz)).
+                              * These are standard bands used in Betaflight and iNav.
+                              * You can add custom bands here if needed. */
+#define BAND_TABLE_DEFAULT    {   /* Band A (Boscam A) */                           \
+                                  { 'A', { 'B','O','S','C','A','M',' ','A' },       \
+                                    { 5865,5845,5825,5805,5785,5765,5745,5725 } },  \
+                                  /* Band B (Boscam B) */                           \
+                                  { 'B', { 'B','O','S','C','A','M',' ','B' },       \
+                                    { 5733,5752,5771,5790,5809,5828,5847,5866 } },  \
+                                  /* Band E */                                      \
+                                  { 'E', { 'B','A','N','D',' ','E',' ',' ' },       \
+                                    { 5705,5685,5665,5645,5885,5905,5925,5945 } },  \
+                                  /* Band F (FatShark) */                           \
+                                  { 'F', { 'F','A','T','S','H','A','R','K' },       \
+                                    { 5740,5760,5780,5800,5820,5840,5860,5880 } },  \
+                                  /* Band R (Raceband) */                           \
+                                  { 'R', { 'R','A','C','E','B','A','N','D' },       \
+                                    { 5658,5695,5732,5769,5806,5843,5880,5917 } },  \
+                              }
+
 /* Optional helpers to query current state (for OSD, logs, etc.) */
 typedef struct {
   uint8_t band;        // 1..5 (A/B/E/F/R), 0 if using frequency

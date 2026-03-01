@@ -38,7 +38,7 @@ EXEC_RAM bool msp_displayport_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16
             switch(sub_cmd) {
             case MSP_DISPLAYPORT_KEEPALIVE: // 0 -> Open/Keep-Alive DisplayPort
                 if (!displayport_initialized) {
-                    #if defined(BUILD_VARIANT_VTX)
+                    #if defined(USE_VTX)
                     vtx_msp_request_config(owner);
                     #endif
                     displayport_initialized = true;

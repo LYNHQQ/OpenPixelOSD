@@ -2,20 +2,32 @@
 /**
  * Copyright (C) 2025 Vitaliy N <vitaliy.nimych@gmail.com>
  */
-#include "rf_pa.h"
 #include "main.h"
+
+#if defined(USE_VTX)
+
+#include "rf_pa.h"
 #include <stdbool.h>
 #include <string.h>
 #include "rtc6705.h"
 #include "vtx_msp.h"
 #include "flash.h"
 
+#ifndef POWER_TABLE 
+#define POWER_TABLE         POWER_TABLE_DEFAULT
+#endif
+
 static uint16_t g_vref_mv = 0;
 float rf_detector_target = 0;
 double rf_detector = 0;
 static float pa_control_i = 0;
 static float pa_control_last_deviation = 0;
+powerTable_t powerTable[] = POWER_TABLE;
 
+uint8_t rf_pa_power_count(void)
+{
+    return (sizeof(powerTable)/sizeof(powerTable[0]) - 1);
+}
 
 static inline void dac_ch2_write_mv(uint16_t mv)
 {
@@ -249,3 +261,4 @@ void rf_pa_loop(void)
     }
     #endif
 }
+#endif

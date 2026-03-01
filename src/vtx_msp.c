@@ -4,6 +4,9 @@
  */
 #include "vtx_msp.h"
 #include "main.h"
+
+#if defined(USE_VTX)
+
 #include "msp.h"
 #include "msp_displayport.h"
 #include "msp_protocol.h"
@@ -18,9 +21,14 @@
 #include <string.h>
 #include <stdio.h>
 
-static void vtx_apply_hw(const vtx_config_t *cfg);
+#ifndef BAND_TABLE 
+#define BAND_TABLE          BAND_TABLE_DEFAULT
+#endif
 
-extern const vtx_band_t g_bands[];
+static void vtx_apply_hw(const vtx_config_t *cfg);
+static const vtx_band_t g_bands[] = BAND_TABLE;
+
+#define NUM_BANDS           (sizeof(g_bands)/sizeof(g_bands[0]))
 
 static vtx_config_t g_cfg = {
     .band = 5,
@@ -64,6 +72,11 @@ const vtx_config_t* vtx_get_config(void)
 const char* vtx_get_band_name(uint8_t band)
 {
     return (char*)&g_bands[band].band_name;
+}
+
+uint8_t vtx_get_band_count(void)
+{
+    return NUM_BANDS;
 }
 
 uint16_t vtx_get_power_mw(void)
@@ -519,3 +532,4 @@ bool vtx_msp_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, con
     }
     return true;
 }
+#endif

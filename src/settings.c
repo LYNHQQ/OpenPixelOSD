@@ -16,7 +16,7 @@
 setting_t settings;
 
 void settings_load(void) {
-  #if defined(BUILD_VARIANT_VTX)
+  #if defined(USE_VTX)
   vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
   #endif
 
@@ -30,7 +30,7 @@ void settings_load(void) {
     settings.frequency = 5800;
   } 
 
-  #if defined(BUILD_VARIANT_VTX)
+  #if defined(USE_VTX)
   vtx_config->band = settings.band;
   vtx_config->channel = settings.channel;
   vtx_config->power = settings.power;
@@ -39,7 +39,7 @@ void settings_load(void) {
 }
 
 void settings_save(void) {
-  #if defined(BUILD_VARIANT_VTX)
+  #if defined(USE_VTX)
   vtx_config_t *vtx_config = (vtx_config_t*)vtx_get_config();
 
   settings.idx = BLOCK_SETTINGS;

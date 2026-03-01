@@ -7,6 +7,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define POWER_TABLE_DEFAULT     { {0,   {' ', ' ', '0'}, RTC6705_PA_3dBm,   { 5650, 5700, 5750, 5800, 5850, 5900, 5950 },   \
+                                                                            {    0,    0,    0,    0,    0,    0,    0 }},  \
+                                  {25,  {' ', '2', '5'}, RTC6705_PA_7dBm,   {    1,    1,    1,    1,    1,    1,    1 },   \
+                                                                            {    0,    0,    0,    0,    0,    0,    0 }},  \
+                                  {100, {'1', '0', '0'}, RTC6705_PA_13dBm,  {    1,    1,    1,    1,    1,    1,    1 },   \
+                                                                            {    0,    0,    0,    0,    0,    0,    0 }},  \
+                                }
+
 #define POWER_LABEL_LENGTH      3
 #define RF_PA_PWR_OFF           0
 

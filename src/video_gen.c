@@ -180,7 +180,7 @@ volatile const uint16_t blank_pal_signal[GEN_BLANK_PAL_LINES] =
 
 CCMRAM_BSS volatile bool video_gen_enabled = false;
 
-EXEC_RAM void video_gen_start(void)
+void video_gen_start(void)
 {
     if (video_gen_enabled == false) {
         LL_TIM_CC_EnableChannel(TIM17, LL_TIM_CHANNEL_CH1);
@@ -212,7 +212,7 @@ EXEC_RAM void video_gen_start(void)
     }
 }
 
-EXEC_RAM void video_gen_stop(void)
+void video_gen_stop(void)
 {
     if (video_gen_enabled == true) {
         LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_5);

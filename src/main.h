@@ -172,8 +172,6 @@ typedef enum {
 
 #define SYNC_LOST_FRAMES_THRESHOLD              20
 
-#define BOXID_CAM_SWITCH                        MSP_BOXID_CAMERA_CONTROL_1
-
 
 #ifndef MAX
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))

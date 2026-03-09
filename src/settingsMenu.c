@@ -177,7 +177,7 @@ void changeVideoIn(ButtonEvent_e __attribute__((unused)) btn, uint8_t __attribut
     settings.activeVideoInput = 1;
     settings.camswitchEnabled = false;
   } if(tempVideoInput == 2) {
-    set_video_input(fc.status.cameraControl);
+    set_video_input(fc.status.cameraControl1);
     settings.activeVideoInput = 0;
     settings.camswitchEnabled = true;
   }
@@ -268,7 +268,7 @@ void msp_menu(void) {
 
   if (btnLast == BTN_MID && (btn == BTN_LEFT || btn == BTN_RIGHT)) {
     if (osdMenue[selectedEntry].keyFunc != NULL) {
-      osdMenue[selectedEntry].keyFunc(btn, selectedEntry);
+      osdMenue[selectedEntry].keyFunc(btn, osdMenue[selectedEntry].idx);
       for (uint8_t i = 0; i < MENUE_SIZE; i++) {
         if (osdState == OSD_MENU && osdMenue[i].printFunc != NULL)
           osdMenue[i].printFunc(OSD_MENU_VALUE_LEFT ,OSD_MENU_TOP + i, osdMenue[i].idx);

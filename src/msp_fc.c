@@ -14,7 +14,7 @@
 
 
 fc_t fc;
-uint8_t boxIdIdx = 0;
+uint8_t boxIdIdx[3] = {0};
 
 uint16_t debug0;
 uint16_t debug1;
@@ -43,6 +43,19 @@ void set_color_phase(videoMode_t mode);
 extern uint16_t colorDelay;
 #endif
 
+
+__weak void cameraControl1_changed(bool value) {
+  UNUSED(value);
+}
+
+__weak void cameraControl2_changed(bool value) {
+  UNUSED(value);
+}
+
+__weak void cameraControl3_changed(bool value) {
+  UNUSED(value);
+}
+
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
     uint32_t status;
@@ -60,30 +73,36 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
             fc.status.armed = 0;
         }
 
-        if (boxIdIdx) {
-          if(!fc.status.cameraControl && (status & 1<<boxIdIdx)) {
-            fc.status.cameraControl = 1;
-            #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
-            TRACE_INFO("CAM SWITCH on\n");
-            if (settings.camswitchEnabled)
-              set_video_input(1);
-            #endif
-          } else if (fc.status.cameraControl && !(status & 1<<boxIdIdx)) {
-            fc.status.cameraControl = 0;
-            #if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
-            TRACE_INFO("CAM SWITCH off\n");
-            if (settings.camswitchEnabled)
-              set_video_input(0);
-            #endif
-          }
+        if (boxIdIdx[0] && (fc.status.cameraControl1 != ((status>>boxIdIdx[0]) & 0x01))) {
+          fc.status.cameraControl1 = ((status>>boxIdIdx[0]) & 0x01);
+          cameraControl1_changed(fc.status.cameraControl1);
+          TRACE_INFO("CAMERA_CONTROL_1 %i\n", fc.status.cameraControl1);
+        }   
+        if (boxIdIdx[1] && (fc.status.cameraControl2 != ((status>>boxIdIdx[1]) & 0x01))) {
+          fc.status.cameraControl2 = ((status>>boxIdIdx[1]) & 0x01);
+          cameraControl2_changed(fc.status.cameraControl2);
+          TRACE_INFO("CAMERA_CONTROL_2 %i\n", fc.status.cameraControl2);
+        }
+        if (boxIdIdx[2] && (fc.status.cameraControl3 != ((status>>boxIdIdx[2]) & 0x01))) {
+          fc.status.cameraControl3 = ((status>>boxIdIdx[2]) & 0x01);
+          cameraControl3_changed(fc.status.cameraControl3);
+          TRACE_INFO("CAMERA_CONTROL_3 %i\n", fc.status.cameraControl3);
         }
         break;
 
     case MSP_BOXIDS:
         for (uint16_t i = 0; i < data_size; i++) {
-          if (BOXID_CAM_SWITCH && (payload[i] == BOXID_CAM_SWITCH)) {
-            boxIdIdx = i;
-            TRACE_INFO("BOXID IDX CAM SWITCH %02x\n", i)
+          if (payload[i] == MSP_BOXID_CAMERA_CONTROL_1) {
+            boxIdIdx[0] = i;
+            TRACE_INFO("BOXID CAMERA_CONTROL_1 %02x\n", i)
+          }
+          if (payload[i] == MSP_BOXID_CAMERA_CONTROL_2) {
+            boxIdIdx[1] = i;
+            TRACE_INFO("BOXID CAMERA_CONTROL_2 %02x\n", i)
+          }
+          if (payload[i] == MSP_BOXID_CAMERA_CONTROL_3) {
+            boxIdIdx[2] = i;
+            TRACE_INFO("BOXID CAMERA_CONTROL_3 %02x\n", i)
           }
         }
         break;

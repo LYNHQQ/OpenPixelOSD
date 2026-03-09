@@ -134,7 +134,6 @@ void set_video_input(uint8_t input)
   else
     activeVideoInput = 0;
 
-  set_video_source(videoInputs[activeVideoInput].opampInput);
   sync_lost = 1;
 
   LL_COMP_SetInputPlus(COMP2, videoInputs[activeVideoInput].compInput);
@@ -946,3 +945,18 @@ void setSyncMode(syncMode_t mode) {
   }
 
 }
+
+#if (VIDEO1_INPUT_ENABLED == true && VIDEO2_INPUT_ENABLED == true)
+void cameraControl1_changed(bool value) {
+  if(value) {
+    TRACE_INFO("CAM SWITCH on\n");
+    if (settings.camswitchEnabled)
+      set_video_input(1);
+  } else {
+    
+    TRACE_INFO("CAM SWITCH off\n");
+    if (settings.camswitchEnabled)
+      set_video_input(0);
+  }
+}
+#endif

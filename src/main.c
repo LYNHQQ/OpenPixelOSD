@@ -13,6 +13,7 @@
 #include "led.h"
 #include "settings.h"
 #include "settingsMenu.h"
+#include "runcam.h"
 #if defined(USE_VTX)
 #include "rtc6705.h"
 #include "rf_pa.h"
@@ -96,6 +97,10 @@ int main (void)
     }
 #endif
 
+#if defined(USE_RUNCAM)
+    runcam_init();
+#endif
+
     while (1)
     {
         msp_loop_process();
@@ -107,6 +112,10 @@ int main (void)
 
 #if defined(USE_VTX)
         rf_pa_loop();
+#endif
+
+#if defined(USE_RUNCAM)
+        runcam_loop();
 #endif
 
 #if 0 // TODO: remove later

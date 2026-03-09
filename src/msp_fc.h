@@ -5,7 +5,9 @@
 
 typedef struct {
   bool armed : 1;
-  bool cameraControl : 1;
+  bool cameraControl1 : 1;
+  bool cameraControl2 : 1;
+  bool cameraControl3 : 1;
 } fc_status_t;
 
 typedef struct {

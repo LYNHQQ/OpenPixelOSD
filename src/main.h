@@ -21,6 +21,7 @@
 #include "stm32g4xx_ll_usart.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_adc.h"
+#include "stm32g4xx_ll_rtc.h"
 #include "trace.h"
 #include "targets/target.h"
 

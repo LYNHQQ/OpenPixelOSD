@@ -63,6 +63,7 @@ EXEC_RAM static void msp_callback(uint8_t owner, msp_version_t msp_version, uint
     case MSP_STATUS:
     case MSP_BOXIDS:
     case MSP_RC:
+    case MSP_REBOOT:
     case MSP_DEBUG:
         msp_fc_handle_msp(owner, msp_cmd, data_size, payload);
         break;

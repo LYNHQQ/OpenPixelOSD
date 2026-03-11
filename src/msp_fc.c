@@ -43,6 +43,17 @@ void set_color_phase(videoMode_t mode);
 extern uint16_t colorDelay;
 #endif
 
+void msp_reboot(uint8_t rebootMode)
+{
+    if (rebootMode >= MSP_REBOOT_COUNT)
+        return;
+
+    LL_RTC_BKP_SetRegister(RTC, LL_RTC_BKP_DR1, rebootMode);
+
+    __disable_irq();
+    NVIC_SystemReset();
+}
+
 bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
     uint32_t status;
@@ -91,6 +102,12 @@ bool msp_fc_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, cons
     case MSP_RC:
         memcpy(fc.rcChannel, (uint16_t*)payload, sizeof(fc.rcChannel));
         fc.stickPos = mspStickpos();
+        break;
+        
+    case MSP_REBOOT:
+        if(data_size > 0) {
+          msp_reboot(payload[0]);
+        }
         break;
 
     case MSP_DEBUG:

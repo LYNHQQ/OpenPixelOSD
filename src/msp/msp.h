@@ -111,6 +111,12 @@ typedef enum {
       MSP_OUTBOUND
 }msp_direction_t;
 
+enum {
+    MSP_REBOOT_FIRMWARE = 0,
+    MSP_REBOOT_BOOTLOADER_ROM,
+    MSP_REBOOT_COUNT,
+};
+
 void msp_process_received_data(msp_port_t *mspPort, uint8_t c);
 
 uint16_t construct_msp_command_v1(uint8_t message_buffer[], uint8_t command, const uint8_t *payload, uint8_t size, msp_direction_t direction);

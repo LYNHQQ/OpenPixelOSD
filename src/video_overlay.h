@@ -60,7 +60,6 @@ extern bool show_test_pattern;
 extern uint16_t video_levels[];
 extern uint16_t sync_levels[];
 
-void set_video_input(uint8_t input);
 void video_overlay_init(void);
 void video_sync_loop(void);
 void setSyncMode(syncMode_t mode);

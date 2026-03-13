@@ -13,12 +13,7 @@
 #include <string.h>
 #include "canvas_char.h"
 #include "video_overlay.h"
-
-#if defined(USE_COLOR)
-#include "fonts/font_bf_color.h"
-#else
-#include "fonts/font_bf_default.h"
-#endif
+#include "fonts/font_betaflight.h"
 
 #include "fonts/font_system.h"
 #include <stdarg.h>

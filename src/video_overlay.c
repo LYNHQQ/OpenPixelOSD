@@ -16,11 +16,7 @@
 #include "video_color.h"
 
 #if !defined(USE_GRAPHICS)
-#if defined(USE_COLOR)
-#include "fonts/font_bf_color.h"
-#else
-#include "fonts/font_bf_default.h"
-#endif
+#include "fonts/font_betaflight.h"
 #include "logo/logo.h"
 #endif
 

@@ -26,6 +26,56 @@ typedef enum {
     MSP_DISPLAYPORT_FONTCHAR_WRITE
 } msp_displayport_cmd_t;
 
+typedef enum {
+    DISPLAYPORT_SYS_GOGGLE_VOLTAGE = 0,
+    DISPLAYPORT_SYS_VTX_VOLTAGE = 1,
+    DISPLAYPORT_SYS_BITRATE = 2,
+    DISPLAYPORT_SYS_DELAY = 3,
+    DISPLAYPORT_SYS_DISTANCE = 4,
+    DISPLAYPORT_SYS_LQ = 5,
+    DISPLAYPORT_SYS_GOGGLE_DVR = 6,
+    DISPLAYPORT_SYS_VTX_DVR = 7,
+    DISPLAYPORT_SYS_WARNINGS = 8,
+    DISPLAYPORT_SYS_VTX_TEMP = 9,
+    DISPLAYPORT_SYS_FAN_SPEED = 10,
+    DISPLAYPORT_SYS_COUNT,
+} displayPortSystemElement_e;
+
+void msp_draw_system(uint8_t row, uint8_t col, uint8_t element) {
+  char buffer[16];
+
+   switch(element) {
+    case DISPLAYPORT_SYS_VTX_VOLTAGE:
+      {
+        float vtxVoltage = adc_read_mv(ADC_CH_RESERVED);
+        vtxVoltage = vtxVoltage / 500;
+        snprintf(buffer, sizeof(buffer), "V %.1f%c", vtxVoltage, 0x06);
+        canvas_char_write(col, row, (const char *)&buffer[0], 6, 0);
+      }
+      break;
+    case DISPLAYPORT_SYS_VTX_TEMP:
+      {
+        float vtxTemp = adc_read_mcu_temp_c();
+        snprintf(buffer, sizeof(buffer), "V%c %.0f%c", 0x7a, vtxTemp, 0x0e);
+        canvas_char_write(col, row, (const char *)&buffer[0], 6, 0);
+      }
+      break;
+    case DISPLAYPORT_SYS_LQ:
+      {
+        if(vtx_get_config()->pitmode) {
+          snprintf(buffer, sizeof(buffer), "V%c%i   ", 0x15, vtx_get_power_mw());
+        } else {
+          snprintf(buffer, sizeof(buffer), "V %i   ", vtx_get_power_mw());
+        }
+        
+        canvas_char_write(col, row, (const char *)&buffer[0], 5, 0);
+      }
+      break;
+    default:
+      break;
+  }
+    
+}
 
 EXEC_RAM bool msp_displayport_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16_t data_size, const uint8_t *payload)
 {
@@ -84,6 +134,10 @@ EXEC_RAM bool msp_displayport_handle_msp(uint8_t owner, uint16_t msp_cmd, uint16
                 break;
 
             case MSP_DISPLAYPORT_SET_OPTIONS: // 5 -> Set Options (HDZero/iNav)
+                break;
+            
+            case MSP_DISPLAYPORT_DRAW_SYSTEM:
+                msp_draw_system(payload[1], payload[2], payload[3]);
                 break;
 
             case MSP_DISPLAYPORT_FONTCHAR_WRITE:

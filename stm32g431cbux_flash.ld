@@ -63,7 +63,7 @@ __eeprom_size = 0x1000;
 /* Specify the memory areas */
 MEMORY
 {
-  RAM (xrw)         : ORIGIN = 0x20000000, LENGTH = 32K
+  RAM (xrw)         : ORIGIN = 0x20000000, LENGTH = 22K
   FLASH (rx)        : ORIGIN = 0x08000000, LENGTH = 0x20000 - __eeprom_size - 0x4000 - 0x2000  /* 112K - 8K -4K = 100K */
   FLASH_LOGO (rx)   : ORIGIN = 0x08000000 + (0x20000 - __eeprom_size - 0x4000 - 0x2000), LENGTH = 0x2000  /* 8K */
   FLASH_FONT (rx)   : ORIGIN = 0x08000000 + (0x20000 - __eeprom_size - 0x4000 ), LENGTH = 0x4000           /* 16K */
@@ -240,7 +240,11 @@ SECTIONS
     . = ALIGN(8);
   } >RAM
 
-  
+  .noinit (NOLOAD) :
+  {
+      *(.noinit)
+  } >RAM
+
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

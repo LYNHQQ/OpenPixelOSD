@@ -145,11 +145,9 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
 
     /* Program synthesizer frequency (MHz) */
     if (freq_is_in_58ghz(cfg->frequency)) {
-        rtc6705_set_frequency(cfg->frequency);
-    }
-
-    /* Set power */
-    if (!cfg->pitmode) {
+      rtc6705_set_frequency(cfg->frequency);
+      /* Set power */
+      if (!cfg->pitmode) {
         /* Set internal RTC6705 PA power */
         rtc6705_allow_power_writes(true);
         rtc6705_set_power(powerTable[cfg->power].rtcPA);
@@ -158,7 +156,12 @@ static void vtx_apply_hw(const vtx_config_t *cfg)
         /* Set external RF Power Amplifier */
         rf_pa_set_power_level(cfg->power);
         led_set(0,RGB_GREEN);
+      }
+    } else {
+      rtc6705_set_frequency(0);
+      led_set(0,RGB_RED);
     }
+    
 }
 
 static void handle_msp_set_vtx_config(uint8_t owner, const uint8_t *payload, uint16_t data_size)
